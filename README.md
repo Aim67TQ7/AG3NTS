@@ -1,6 +1,6 @@
-# AG3NTS — FLUX Studio
+# AG3NTS — OφERIS Studio
 
-FLUX Studio builds and operates agents with explicit responsibilities, durable FLUX handoffs, versioned contracts, audit evidence and human review. This repository contains the full current application source captured from the PETE server on October 16, 2026, including the deployed MCP v2 proposal and runtime-observation changes.
+OφERIS Studio (formerly FLUX Studio) builds and operates agents with explicit responsibilities, durable FLUX handoffs, versioned contracts, audit evidence and human review. This repository contains the full current application source captured from the PETE server on October 16, 2026, including the deployed MCP v2 proposal and runtime-observation changes.
 
 [Live application](https://flux.by-pete.com) · [MCP endpoint](https://flux.by-pete.com/mcp) · [MCP v2 guide](docs/MCP-V2.md) · [Governance](docs/WORKFLOW-GOVERNANCE.md)
 
