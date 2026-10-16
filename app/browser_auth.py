@@ -1,4 +1,4 @@
-"""Owner sign-in reuses PETE's existing scrypt passcode hash; FLUX holds sessions."""
+"""Owner sign-in reuses PETE's existing scrypt passcode hash; Operis holds sessions."""
 import asyncio,hashlib,hmac,json,os,re,secrets,time
 from pathlib import Path
 from fastapi.responses import HTMLResponse,JSONResponse,RedirectResponse

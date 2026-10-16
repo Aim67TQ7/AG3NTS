@@ -11,7 +11,7 @@
     {
       "code": "READ",
       "title": "Data Retriever",
-      "description": "Pulls exact records from Epicor, Graph, SharePoint or FLUX",
+      "description": "Pulls exact records from Epicor, Graph, SharePoint or Operis",
       "color": "#0284C7"
     },
     {
@@ -202,7 +202,7 @@
           "options": [
             {
               "id": "flux_record",
-              "label": "Flux record"
+              "label": "Operis record"
             },
             {
               "id": "schedule",
@@ -344,7 +344,7 @@
           "options": [
             {
               "id": "flux",
-              "label": "Flux"
+              "label": "Operis"
             },
             {
               "id": "outlook_graph",

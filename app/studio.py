@@ -119,7 +119,7 @@ async def users():
     from . import fresh
     if fresh.enabled() and fresh.CTX.get():
         c=fresh.CTX.get()
-        return {'users':[{'id':c['user']['id'],'label':c['user'].get('email',c['user']['id'])}],'roles':['designer','publisher'],'identity_source':'FLUX authenticated user','directory_connected':True}
+        return {'users':[{'id':c['user']['id'],'label':c['user'].get('email',c['user']['id'])}],'roles':['designer','publisher'],'identity_source':'Operis authenticated user','directory_connected':True}
     # The existing private-SSH boundary supplies one authenticated operator, not a fabricated directory.
     return {'users':[{'id':os.environ.get('STUDIO_OPERATOR_ID','ssh-owner'),'label':os.environ.get('STUDIO_OPERATOR_LABEL','Current authenticated operator')}],'roles':['designer','publisher'],'identity_source':'PETE passcode owner' if os.environ.get('STUDIO_PUBLIC_HOST') else 'private SSH operator boundary','directory_connected':False}
 @router.get('/catalog')
@@ -372,7 +372,7 @@ async def email_template():
     if r.status_code!=200 or not r.json():raise Invalid('The matching captured email could not be verified')
     capture=r.json()[0];same=capture['message_id']==read['message_id']
     await store.event('studio.replay',{'mode':'existing-record-read-only','message_id':read['message_id'],'capture_hash':digest(capture),'read_hash':digest(read),'writes_to_existing_pipeline':False})
-    return {'name':'Email capture → Document read','nodes':[{'id':'capture','type':'capability','position':{'x':70,'y':100},'data':{**entries[0],'deployed':True,'evidence':capture,'status':'Observed'}},{'id':'read','type':'capability','position':{'x':440,'y':100},'data':{**entries[1],'deployed':True,'evidence':read,'status':'Observed'}}],'edges':[{'id':'capture-read','source':'capture','target':'read','sourceHandle':'COMPLETED','targetHandle':'input','data':{'compatible':False,'gaps':['Existing FLUX key handoff verified; full portable schema is Unverified.'],'record_type':'email.captured','evidence':{'same_message_id':same,'message_id':read['message_id'],'captured':capture['completed_at'],'read':read['extracted_at']}}}],'replay_mode':'Historical committed records only. No pipeline agent was triggered.'}
+    return {'name':'Email capture → Document read','nodes':[{'id':'capture','type':'capability','position':{'x':70,'y':100},'data':{**entries[0],'deployed':True,'evidence':capture,'status':'Observed'}},{'id':'read','type':'capability','position':{'x':440,'y':100},'data':{**entries[1],'deployed':True,'evidence':read,'status':'Observed'}}],'edges':[{'id':'capture-read','source':'capture','target':'read','sourceHandle':'COMPLETED','targetHandle':'input','data':{'compatible':False,'gaps':['Existing Operis key handoff verified; full portable schema is Unverified.'],'record_type':'email.captured','evidence':{'same_message_id':same,'message_id':read['message_id'],'captured':capture['completed_at'],'read':read['extracted_at']}}}],'replay_mode':'Historical committed records only. No pipeline agent was triggered.'}
 
 @router.post('/validate-canvas')
 async def validate_canvas_endpoint(b:dict):

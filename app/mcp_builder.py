@@ -21,7 +21,7 @@ TOOLS=[
  {'name':'read_resource','description':'Read an exact versioned, non-secret resource reference returned by list_resources or propose_schema/propose_rule.','inputSchema':obj({'id':STR})},
  {'name':'read_agent_draft','description':'Read a saved or proposed agent draft with revision, hash, review status and fresh server validation.','inputSchema':obj({'draft_id':STR})},
  {'name':'update_agent_draft','description':'Propose a targeted field patch. Requires current hash and stable request UUID. Does not overwrite other fields. Any prior review is invalidated.','inputSchema':obj({'request_id':UUID,'draft_id':STR,'expected_hash':HASH,'fields':{'type':'object','minProperties':1,'additionalProperties':FIELD}})},
- {'name':'propose_connected_workflow','description':'Propose a bounded set of agents and semantic FLUX handoff edges atomically. Browser Apply saves the connected canvas, still Off.','inputSchema':obj({'request_id':UUID,'name':STR,'workflow_id':STR,'expected_hash':HASH,'nodes':{'type':'array','minItems':1,'maxItems':30,'items':obj({'key':STR,'agent':AGENT,'draft_id':STR},['key'])},'edges':{'type':'array','maxItems':100,'items':EDGE}},['request_id','name','nodes','edges'])},
+ {'name':'propose_connected_workflow','description':'Propose a bounded set of agents and semantic Operis handoff edges atomically. Browser Apply saves the connected canvas, still Off.','inputSchema':obj({'request_id':UUID,'name':STR,'workflow_id':STR,'expected_hash':HASH,'nodes':{'type':'array','minItems':1,'maxItems':30,'items':obj({'key':STR,'agent':AGENT,'draft_id':STR},['key'])},'edges':{'type':'array','maxItems':100,'items':EDGE}},['request_id','name','nodes','edges'])},
  {'name':'propose_connections','description':'Atomically add a set of validated handoff edges to a workflow proposal. Invalid endpoints/outcomes or incompatible known contracts save nothing.','inputSchema':obj({'request_id':UUID,'workflow_id':STR,'expected_hash':HASH,'edges':{'type':'array','minItems':1,'maxItems':100,'items':EDGE}})},
  {'name':'propose_schema','description':'Propose a bounded object JSON Schema for Resources review. Returns its immutable canonical pin; no model approval.','inputSchema':obj({'request_id':UUID,'resource_id':STR,'version':STR,'label':STR,'schema':{'type':'object'}})},
  {'name':'propose_rule','description':'Propose structured equals/present/tolerance checks for Resources review. Tolerance checks remain planning-only until runtime support is certified.','inputSchema':obj({'request_id':UUID,'resource_id':STR,'version':STR,'label':STR,'rule':{'type':'array','minItems':1,'maxItems':50,'items':{'type':'object'}}})},
@@ -213,7 +213,7 @@ class Session:
    if any(x['source']==source and x.get('sourceHandle')==outcome and x['target']!=target for x in edges):fail('ambiguous_handoff','One outcome must have one target; propose explicit outcome routing')
    key=(source,target,outcome)
    if key in seen:continue
-   edges.append({'id':str(uuid.uuid5(uuid.NAMESPACE_URL,w['id']+':'+':'.join(key))),'source':source,'target':target,'sourceHandle':outcome,'targetHandle':'input','label':outcome,'data':{'direct':True,'semantics':'Durable FLUX handoff; no direct agent call','dispatch_enabled':False}});seen.add(key)
+   edges.append({'id':str(uuid.uuid5(uuid.NAMESPACE_URL,w['id']+':'+':'.join(key))),'source':source,'target':target,'sourceHandle':outcome,'targetHandle':'input','label':outcome,'data':{'direct':True,'semantics':'Durable Operis handoff; no direct agent call','dispatch_enabled':False}});seen.add(key)
   for e in edges:
    if e['source'] not in nodes or e['target'] not in nodes:fail('invalid_connection','Stored edge endpoint is not a workflow member')
    choices=studio.CATALOG['outcomes'].get(nodes[e['source']]['data']['guided']['fields'].get('output.outcomes',{}).get('value'),[])
@@ -258,7 +258,7 @@ class Session:
    return source
   if kind=='waiver':
    r=self.state['waivers'].get(source['waiver_id'])
-   if not r or r.get('review_status')!='approved' or r['content_hash']!=source['content_hash']:fail('discovery_waiver_required','An owner must approve this exact waiver in FLUX first')
+   if not r or r.get('review_status')!='approved' or r['content_hash']!=source['content_hash']:fail('discovery_waiver_required','An owner must approve this exact waiver in Operis first')
    return source
   if kind=='discovery':
    from .discovery import context
@@ -312,7 +312,7 @@ async def dispatch(name,args,store):
   return {k:v for k,v in r.items() if k!='content'} if args.get('detail')=='summary' else r
  if name=='builder_context':
   from .mcp_connection import identity,rpc as old_rpc
-  return {'identity':identity(),'profile':await old_rpc(store,'mcp_profile',{'access_token':s.ctx['token']}),'catalog':s.catalog(),'catalog_hash':digest(studio.CATALOG),'resources':[{**{k:v for k,v in r.items() if k!='content'},**({'schema':r['content']} if r['kind']=='schema' and args.get('detail')!='summary' else {'title':r['content'].get('title'),'required':r['content'].get('required',[])} if r['kind']=='schema' else {})} for r in sorted(s.resources.values(),key=lambda r:r['id'])],'completeness_matrix':mcp_v2.COMPLETENESS,'secret_kinds':[{'id':k,'required_fields':v[0],'scopes':v[1]} for k,v in mcp_v2.SECRET_KINDS.items()],'connections':s.snapshot.get('connections',[]),'templates':[r for r in s.resources.values() if r['kind']=='template'],'instructions':'One responsibility per agent. Use exact catalog IDs and resource pins. Invalid values are rejected. Publication, credentials and activation require human review in FLUX. Drafts remain TEST and Off.'}
+  return {'identity':identity(),'profile':await old_rpc(store,'mcp_profile',{'access_token':s.ctx['token']}),'catalog':s.catalog(),'catalog_hash':digest(studio.CATALOG),'resources':[{**{k:v for k,v in r.items() if k!='content'},**({'schema':r['content']} if r['kind']=='schema' and args.get('detail')!='summary' else {'title':r['content'].get('title'),'required':r['content'].get('required',[])} if r['kind']=='schema' else {})} for r in sorted(s.resources.values(),key=lambda r:r['id'])],'completeness_matrix':mcp_v2.COMPLETENESS,'secret_kinds':[{'id':k,'required_fields':v[0],'scopes':v[1]} for k,v in mcp_v2.SECRET_KINDS.items()],'connections':s.snapshot.get('connections',[]),'templates':[r for r in s.resources.values() if r['kind']=='template'],'instructions':'One responsibility per agent. Use exact catalog IDs and resource pins. Invalid values are rejected. Publication, credentials and activation require human review in Operis. Drafts remain TEST and Off.'}
  if name=='read_agent_draft':
   r=s.agent_result(s.agent(args['draft_id']));return mcp_v2.compact_result(r,'agent') if args.get('detail')=='summary' else r
  if name=='read_workflow':

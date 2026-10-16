@@ -37,7 +37,7 @@ async def put(path,obj):
         try: duplicate=str(r.json().get('statusCode'))=='409'
         except Exception: duplicate=False
         if duplicate or r.status_code==409:raise HTTPException(409,'Immutable record already exists; save a new version')
-        raise HTTPException(503,'Durable FLUX commit failed: '+str(r.status_code))
+        raise HTTPException(503,'Durable Operis commit failed: '+str(r.status_code))
     return obj
 async def get(path):
     if fresh.enabled():
@@ -49,7 +49,7 @@ async def get(path):
             if r.status_code not in (429,502,503,504) or attempt:break
             await asyncio.sleep(0.25)
     if r.status_code==404 or r.status_code==400:return None
-    if r.status_code!=200:raise HTTPException(503,'FLUX read unavailable (HTTP '+str(r.status_code)+'). Retry loading the catalog; saved drafts remain intact.')
+    if r.status_code!=200:raise HTTPException(503,'Operis read unavailable (HTTP '+str(r.status_code)+'). Retry loading the catalog; saved drafts remain intact.')
     return r.json()
 async def records(kind):
     if fresh.enabled():
@@ -58,7 +58,7 @@ async def records(kind):
     out=[];offset=0
     while True:
         r=await CLIENT.post(BASE+'/storage/v1/object/list/'+BUCKET,headers=HEAD,json={'prefix':fresh.physical(kind) if fresh.enabled() else kind,'limit':100,'offset':offset,'sortBy':{'column':'name','order':'desc'}})
-        if r.status_code!=200:raise HTTPException(503,'FLUX registry unavailable')
+        if r.status_code!=200:raise HTTPException(503,'Operis registry unavailable')
         rows=r.json()
         for x in rows:
             if x.get('id'):out.append(x['name'])
@@ -93,7 +93,7 @@ async def lifespan(app):
     yield
     await runtime.stop(worker_task)
     await CLIENT.aclose()
-app=FastAPI(title='FLUX Studio',version=APP_VERSION,lifespan=lifespan)
+app=FastAPI(title='Operis Studio',version=APP_VERSION,lifespan=lifespan)
 
 @app.middleware('http')
 async def boundary(request:Request,call_next):
@@ -146,7 +146,7 @@ async def result_snapshot():return FileResponse(WEB_ROOT.parent/'agent-work-resu
 @app.get('/health')
 async def health():
     r=await CLIENT.get(BASE+'/storage/v1/bucket/'+BUCKET,headers=HEAD)
-    return {'status':'ok' if r.status_code==200 else 'degraded','project':BASE,'store':'FLUX private Storage','mode':'SSH-owner private access','existing_dispatch_modified':False,'version':APP_VERSION,'deployment':os.environ.get('STUDIO_DEPLOYMENT_ID','bunting-private')}
+    return {'status':'ok' if r.status_code==200 else 'degraded','project':BASE,'store':'Operis private Storage','mode':'SSH-owner private access','existing_dispatch_modified':False,'version':APP_VERSION,'deployment':os.environ.get('STUDIO_DEPLOYMENT_ID','bunting-private')}
 @app.get('/api/state')
 async def state():
     agents,resources,workflows,audit,runs=await asyncio.gather(versions(),records('resources'),records('workflows'),records('audit'),records('runs'))
@@ -307,7 +307,7 @@ async def live():
         rows=r.json() if r.status_code==200 else []
         safe=[]
         for row in rows:safe.append({k:v for k,v in row.items() if k not in ('package','input','output','body','text')})
-        return {'number':n,'health':health,'runs':safe,'history_error':None if r.status_code==200 else 'FLUX query failed '+str(r.status_code),'table':table}
+        return {'number':n,'health':health,'runs':safe,'history_error':None if r.status_code==200 else 'Operis query failed '+str(r.status_code),'table':table}
     return {'observed_at':now(),'agents':await asyncio.gather(*(one(n) for n in range(1,5))),'project':BASE,'scope':'Existing pipeline; monitoring only. Agent 04 shadow dispatch unchanged.'}
 @app.get('/api/lineage')
 async def lineage():

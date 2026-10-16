@@ -1,4 +1,4 @@
-"""Curated FLUX registry and authoritative binding validation; no raw schema browser."""
+"""Curated Operis registry and authoritative binding validation; no raw schema browser."""
 import os,re,copy
 from fastapi import APIRouter
 from jsonschema import Draft202012Validator
@@ -24,11 +24,11 @@ def admin():
  allowed=os.environ.get('STUDIO_RECORD_ADMINS','ssh-owner').split(',')
  if studio.store.ACTOR.get() not in allowed:raise Invalid('Registry administrator permission required')
 async def rest(method,table,params=None,body=None):
- if fresh.enabled():raise Invalid('Operational record storage is not connected for this workspace; use FLUX Monitor for runtime inputs and results')
+ if fresh.enabled():raise Invalid('Operational record storage is not connected for this workspace; use Operis Monitor for runtime inputs and results')
  if table not in ('studio_record_types','studio_records'):raise Invalid('Unregistered table')
  s=studio.store
  r=await s.CLIENT.request(method,s.BASE+'/rest/v1/'+table,headers={**s.HEAD,'Prefer':'return=representation'},params=params,json=body)
- if r.status_code not in (200,201,204):raise Invalid('FLUX record registry unavailable: '+str(r.status_code))
+ if r.status_code not in (200,201,204):raise Invalid('Operis record registry unavailable: '+str(r.status_code))
  return r.json() if r.content else []
 def scoped():return {k:'eq.'+v for k,v in scope().items()}
 async def registry():
@@ -134,7 +134,7 @@ def validate(w,rows,schemas):
  return {'valid':not errors,'blockers':errors,'missing_handoffs':missing,'scope':'Registry and binding validation; no activation'}
 @router.get('/rows')
 async def rows(record_type:str,status:str='',offset:int=0):
- if fresh.enabled():return {'items':[],'scope':scope(),'runtime_enabled':False,'note':'This workspace has no operational handoff adapter. Runtime inputs and results are available in FLUX Monitor.'}
+ if fresh.enabled():return {'items':[],'scope':scope(),'runtime_enabled':False,'note':'This workspace has no operational handoff adapter. Runtime inputs and results are available in Operis Monitor.'}
  types=(await registry())['items'];r=next((x for x in types if x['name']==record_type and x['kind']=='handoff'),None)
  if not r or offset<0 or (status and status not in r['statuses']):raise Invalid('Unknown handoff query')
  p={**scoped(),'record_type':'eq.'+record_type,'order':'created_at.desc','limit':'25','offset':str(offset)}

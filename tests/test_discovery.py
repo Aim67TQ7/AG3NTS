@@ -66,5 +66,5 @@ class CompanyDiscoveryTests(unittest.IsolatedAsyncioTestCase):
   finally:fresh.CTX.reset(marker)
  def test_company_page_is_escaped_and_has_no_other_company_content(self):
   page=d.page_for_company('n0v8v LLC','n0v8v-discovery-v1')
-  self.assertIn('n0v8v LLC FLUX',page);self.assertNotIn('Richland',page);self.assertNotIn('joint-interest',page);self.assertNotIn('__COMPANY__',page);self.assertNotIn('__STUDIES__',page)
+  self.assertIn('n0v8v LLC Operis',page);self.assertNotIn('Richland',page);self.assertNotIn('joint-interest',page);self.assertNotIn('__COMPANY__',page);self.assertNotIn('__STUDIES__',page)
   self.assertIn('&lt;script&gt;',d.page_for_company('<script>','n0v8v-discovery-v1'))

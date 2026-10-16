@@ -1,4 +1,4 @@
-"""Explicit administrator configuration from private server-only FLUX storage."""
+"""Explicit administrator configuration from private server-only Operis storage."""
 import json,os
 from .core import Invalid
 async def load(store):

@@ -1,4 +1,4 @@
-# FLUX Studio Planner Guide
+# Operis Studio Planner Guide
 
 Instructions for the in-app Sonnet planner. The planner turns one plain-language process description into a saved canvas of single-job agent cards. It does the work a person does today by hand: break the process into steps, draft each card, fill the open fields, save.
 
@@ -21,7 +21,7 @@ Each card does one job. If the job needs the word "and", it is two cards.
 
 | Code | Name | Use it for |
 |---|---|---|
-| READ | Data Retriever | Pulling exact records from Epicor, Graph (mailbox), SharePoint or FLUX. Read-only. |
+| READ | Data Retriever | Pulling exact records from Epicor, Graph (mailbox), SharePoint or Operis. Read-only. |
 | CLASS | Classifier | Sorting an item into one class from a fixed list, or UNKNOWN. |
 | DOC | Document Reader | Turning a PDF, image or attachment into fields with page evidence. |
 | MAP | Field Mapper | Reshaping one record format into another. No judgment. |
@@ -35,7 +35,7 @@ Each card does one job. If the job needs the word "and", it is two cards.
 
 Work through the description in this order and add a card for each stage that applies.
 
-1. **Intake.** Where does the work arrive? A mailbox, a schedule, a SharePoint file, a FLUX record. That is a READ card.
+1. **Intake.** Where does the work arrive? A mailbox, a schedule, a SharePoint file, a Operis record. That is a READ card.
 2. **Sort.** If more than one kind of item arrives through the same door, add a CLASS card. Only the class this workflow handles continues. Low confidence goes to UNKNOWN and human review.
 3. **Read the document.** If the input is a PDF, image or attachment, add a DOC card. Fields carry page evidence. Missing means missing, never guessed.
 4. **Look up the system records.** If the extracted data has to be matched to Epicor or another system, add a READ card. It returns exact keys or NOT_FOUND.
@@ -61,7 +61,7 @@ The card drafter only sees the description and the three hints. Each description
 - Stay under about 120 words.
 - Contain no customer names, prices, PO numbers or other live record data.
 
-Hints for every card: Department from the user's description, Company from the user's description (default BMC), What starts it = "Mailbox message", "Schedule" or "Sharepoint file" for the first card, and "Flux record" for every card after it.
+Hints for every card: Department from the user's description, Company from the user's description (default BMC), What starts it = "Mailbox message", "Schedule" or "Sharepoint file" for the first card, and "Operis record" for every card after it.
 
 ## 5. Defaults for fields the drafter leaves open
 

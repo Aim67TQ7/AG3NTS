@@ -1,4 +1,4 @@
-# FLUX record bindings — Studio 0.4.0
+# Operis record bindings — Studio 0.4.0
 
 Cards read a curated record type/status and publish a durable record type/status per outcome. The diagram derives card → record → card links; it is not execution state. Direct wiring is disabled. Drop a record on a card to bind its input; drop on Reads from or Writes to in the guide to choose the binding direction.
 
@@ -31,7 +31,7 @@ Polling uses immutable events. Terminal outcomes stop; reprocessing uses a delib
 ## Verified and still blocked
 
 - 79 local and VPS-image tests passed, including record validation, tenant denial, source-write denial, stale registry denial, approval fail-closed and idempotent polling/publishing.
-- FLUX transaction test inserted a synthetic handoff and rejected an invalid status, then rolled the transaction back. No test records remain.
+- Operis transaction test inserted a synthetic handoff and rejected an invalid status, then rolled the transaction back. No test records remain.
 - Database grants deny anonymous reads, authenticated inserts and service mutations of existing handoffs.
 - Eight handoff types and seven source references were seeded as DRAFT. None claims an approved schema or working connector.
 - Existing agents remain unchanged; Studio is a design surface. Actual record polling requires a separately activated tested package and certified host coordinator/adapters.

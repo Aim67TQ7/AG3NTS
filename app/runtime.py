@@ -53,7 +53,7 @@ async def compile_workflow(id):
   steps.append({'id':node['id'],'name':g['name'],'agent_id':g['id'],'agent_version':g['version'],'build_id':build['id'],'package_hash':build['package_hash'],'review_path':'teaching/'+latest['id']+'--'+str(latest['revision']).zfill(6)+'.json','config':cfg})
  # Derive a single chain from durable read/write bindings; never from visual positions.
  edges=[]
- if any(e.get('data',{}).get('direct') for e in w.get('edges',[])):raise Invalid('Direct communication needs a certified adapter; configure FLUX record bindings for this runner')
+ if any(e.get('data',{}).get('direct') for e in w.get('edges',[])):raise Invalid('Direct communication needs a certified adapter; configure Operis record bindings for this runner')
  for target in nodes:
   tg=target.get('data',{}).get('guided',{});read=tg.get('bindings',{}).get('reads',{}) or {'record_type':tg.get('fields',{}).get('trigger.source_record',{}).get('value'),'status':'completed'}
   for source in nodes:
@@ -61,7 +61,7 @@ async def compile_workflow(id):
    if source['id']!=target['id'] and read.get('record_type') and read['record_type']==write.get('record_type') and read.get('status')==write.get('outcomes',{}).get('COMPLETED'):edges.append((source['id'],target['id']))
  by={s['id']:s for s in steps};incoming={s['id']:[a for a,b in edges if b==s['id']] for s in steps};outgoing={s['id']:[b for a,b in edges if a==s['id']] for s in steps}
  roots=[i for i in by if not incoming[i]]
- if len(roots)!=1 or any(len(incoming[i])>1 or len(outgoing[i])>1 for i in by):raise Invalid('Configure one unambiguous FLUX handoff chain; branches/joins require a separate runtime contract')
+ if len(roots)!=1 or any(len(incoming[i])>1 or len(outgoing[i])>1 for i in by):raise Invalid('Configure one unambiguous Operis handoff chain; branches/joins require a separate runtime contract')
  ordered=[];id=roots[0]
  while id not in {s['id'] for s in ordered}:
   ordered.append(by[id])
@@ -129,7 +129,7 @@ async def agent_power(b:dict):
   ready_to_activate=controls_allow(plan,changed)
   # Preserve the operator-selected schedule and input; no schedule or payload is invented.
   current=await fresh.rest(studio.store,'GET','flux_runtime_workflows?select=id,input,interval_seconds,definition&client_id=eq.'+c['client']['id']+'&id=eq.'+canvas['id'])
-  if not current or current[0]['definition']!=plan:raise Invalid('Test this exact workflow version successfully in FLUX Monitor before switching it on')
+  if not current or current[0]['definition']!=plan:raise Invalid('Test this exact workflow version successfully in Operis Monitor before switching it on')
   tests=await fresh.rest(studio.store,'GET','flux_runtime_jobs?select=id&client_id=eq.'+c['client']['id']+'&workflow_id=eq.'+canvas['id']+'&test_run=eq.true&status=eq.completed&limit=1')
   if not tests:raise Invalid('Complete a successful workflow test before switching this agent on')
   workflow=current[0]

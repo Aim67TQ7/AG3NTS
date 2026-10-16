@@ -180,7 +180,7 @@ async def publish(b:dict):
   from .fixture_suite import require_publish_evidence
   await require_publish_evidence(r['guided'],studio.store)
   if not a['adapter_certified']:raise Invalid('Runtime adapter needs certification before publication')
-  if not a['config'].get('bindings'):raise Invalid('Configure FLUX record bindings and rebuild before publication')
+  if not a['config'].get('bindings'):raise Invalid('Configure Operis record bindings and rebuild before publication')
   graph=await studio.validate_canvas_endpoint(b.get('canvas',{}))
   if not graph['valid']:raise Invalid('Canvas publication blocked: '+'; '.join(x['message'] for x in graph['blockers']))
   node=next((n for n in b['canvas']['nodes'] if n['data'].get('guided',{}).get('id')==r['agent_id']),None)
@@ -190,7 +190,7 @@ async def publish(b:dict):
   import subprocess,tempfile
   base=Path(root).resolve();base.mkdir(parents=True,exist_ok=True)
   def git(*args):return subprocess.run(['git','-C',str(base),*args],check=True,capture_output=True,text=True,timeout=30).stdout.strip()
-  if not (base/'.git').exists():git('init');git('config','user.name','FLUX Studio');git('config','user.email','studio@localhost')
+  if not (base/'.git').exists():git('init');git('config','user.name','Operis Studio');git('config','user.email','studio@localhost')
   releases=[x for x in await studio.store.records('package-releases') if x['agent_id']==r['agent_id']]
   existing=next((x for x in releases if x['package_hash']==a['package_hash']),None)
   if existing:return {**r,'release':existing}

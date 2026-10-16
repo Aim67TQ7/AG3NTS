@@ -25,7 +25,7 @@ def enrich(session,findings,g=None,node_id=None,workflow_id=None):
 
 def validate(session,w):
  nodes={n['id']:n for n in w.get('nodes',[])};edges=list(w.get('edges',[]));
- # Durable FLUX record/status producers establish handoffs even without visual wires.
+ # Durable Operis record/status producers establish handoffs even without visual wires.
  for aid,a in nodes.items():
   writes=a.get('data',{}).get('guided',{}).get('bindings',{}).get('writes',{})
   for bid,target in nodes.items():
@@ -84,7 +84,7 @@ def validate(session,w):
   if dest not in ('terminal','human_review'):add('invalid-terminal-destination','Choose terminal or human_review',n,['terminal_outcomes'])
  for n,node in nodes.items():
   g=node['data']['guided'];findings.extend(enrich(session,session.validation(g)['findings'],g,n,w['id']))
-  if not g.get('bindings'):add('durable-record-binding-required','Bind approved durable FLUX input/output records before publication',n,['bindings'])
+  if not g.get('bindings'):add('durable-record-binding-required','Bind approved durable Operis input/output records before publication',n,['bindings'])
   for o in session.catalog()['outcomes'].get(field(g,'output.outcomes'),[]):
    matches=[e for e in edges if e.get('source')==n and e.get('sourceHandle')==o]
    if not matches and (n,o) not in terminals:add('outcome-without-destination','Connect '+o+' or explicitly route it to a terminal or human review',n,['output.outcomes'],outcome=o)

@@ -3,7 +3,7 @@ export function triggerConfig(g:any){if(g.trigger_config)return g.trigger_config
 
 export function triggerIdentity(config:any){
   const kind=config?.kind;
-  if(kind==='webhook')return config.source==='flux'?{shape:'flux',label:'FLUX record'}:{shape:'webhook',label:'External webhook'};
+  if(kind==='webhook')return config.source==='flux'?{shape:'flux',label:'Operis record'}:{shape:'webhook',label:'External webhook'};
   return ({listener:{shape:'listener',label:'Listener'},schedule:{shape:'schedule',label:'Schedule / Cron'},manual:{shape:'manual',label:'Manual'},retry:{shape:'retry',label:'Retry'}} as any)[kind]||{shape:'unknown',label:'Trigger not set'};
 }
 export function TriggerShape({config}:any){
