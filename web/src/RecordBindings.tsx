@@ -2,12 +2,13 @@ import fluxLogo from './assets/flux-fphi-logo-3d-v1.png';
 import React,{useState} from 'react';
 import {Handle,Position} from '@xyflow/react';
 import ResultRows from './ResultRows';
+const HUB_SIZE=115,HUB_RADIUS=HUB_SIZE/2;
 export function RecordPill({data}:any){return <div className="flux-hub flux-symbol" aria-label="Shared workspace">{(data.ports||[]).map((p:any)=><Handle key={p.id} type="target" position={Position.Left} id={p.id} isConnectable={false} style={{left:p.x,top:p.y}}/>)}<img className="flux-hub-logo" src={fluxLogo} alt="F𝛟 — shared FLUX workspace"/></div>}
 export function recordGraph(nodes:any[],registry:any[],directEdges:any[]=[]){
- const position={x:570,y:120+Math.max(0,Math.ceil(nodes.length/2)-1)*175};
- const center={x:position.x+115,y:position.y+115};
- const ports=nodes.map(n=>{let dx=n.position.x+(n.measured?.width||250)/2-center.x,dy=n.position.y+(n.measured?.height||300)/2-center.y;let length=Math.hypot(dx,dy)||1;return {id:n.id,x:115+115*dx/length,y:115+115*dy/length}});
- const hub={id:'record:flux',type:'record',width:230,height:230,position,draggable:false,selectable:false,data:{ports}};
+ const position={x:685-HUB_RADIUS,y:235-HUB_RADIUS+Math.max(0,Math.ceil(nodes.length/2)-1)*175};
+ const center={x:position.x+HUB_RADIUS,y:position.y+HUB_RADIUS};
+ const ports=nodes.map(n=>{let dx=n.position.x+(n.measured?.width||250)/2-center.x,dy=n.position.y+(n.measured?.height||300)/2-center.y;let length=Math.hypot(dx,dy)||1;return {id:n.id,x:HUB_RADIUS+HUB_RADIUS*dx/length,y:HUB_RADIUS+HUB_RADIUS*dy/length}});
+ const hub={id:'record:flux',type:'record',width:HUB_SIZE,height:HUB_SIZE,position,draggable:false,selectable:false,data:{ports}};
  const edges=nodes.map(n=>({id:n.id+'-flux',source:n.id,sourceHandle:n.position.x<center.x?'output':'flux-left',target:hub.id,targetHandle:n.id,type:'straight',selectable:false,style:{stroke:'#91a7b6',strokeWidth:2}}));
  return {cards:nodes,pills:[hub],edges:[...edges,...directEdges.filter(e=>e.data?.direct||e.data?.runtime_handoff).map(e=>({...e,sourceHandle:e.data?.semantics?'output':e.sourceHandle,type:'straight',label:e.data?.runtime_handoff?'Durable FLUX handoff':e.data?.semantics?(e.sourceHandle+' · proposed FLUX handoff'):'Direct',style:{stroke:'#62cdb0',strokeWidth:2}}))]}
 }
