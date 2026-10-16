@@ -1,9 +1,9 @@
-import fluxLogo from './assets/flux-fphi-logo-3d-v1.png';
+import operisPhi from './assets/operis-phi-green.png';
 import React,{useState} from 'react';
 import {Handle,Position} from '@xyflow/react';
 import ResultRows from './ResultRows';
 const HUB_SIZE=115,HUB_RADIUS=HUB_SIZE/2;
-export function RecordPill({data}:any){return <div className="flux-hub flux-symbol" aria-label="Shared workspace">{(data.ports||[]).map((p:any)=><Handle key={p.id} type="target" position={Position.Left} id={p.id} isConnectable={false} style={{left:p.x,top:p.y}}/>)}<img className="flux-hub-logo" src={fluxLogo} alt="Shared Operis workspace"/></div>}
+export function RecordPill({data}:any){return <div className="flux-hub flux-symbol" aria-label="Shared workspace">{(data.ports||[]).map((p:any)=><Handle key={p.id} type="target" position={Position.Left} id={p.id} isConnectable={false} style={{left:p.x,top:p.y}}/>)}<img className="flux-hub-logo" src={operisPhi} alt="Operis function symbol"/></div>}
 export function recordGraph(nodes:any[],registry:any[],directEdges:any[]=[]){
  const position={x:685-HUB_RADIUS,y:235-HUB_RADIUS+Math.max(0,Math.ceil(nodes.length/2)-1)*175};
  const center={x:position.x+HUB_RADIUS,y:position.y+HUB_RADIUS};
