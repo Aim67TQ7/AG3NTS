@@ -19,3 +19,11 @@ begin
 end $$;
 
 create table flux_private.mcp_events(user_id uuid,action text,detail jsonb);
+create table public.flux_runtime_jobs(id uuid,client_id text,workflow_id text,definition jsonb,definition_hash text,input jsonb,result jsonb,status text,test_run boolean,created_at timestamptz,finished_at timestamptz);
+create table public.flux_runtime_steps(job_id uuid,client_id text,step int,result jsonb,created_at timestamptz);
+create table flux_private.mail_sources(id text,client_id text,last_seen timestamptz);
+create table flux_private.mail_pipelines(source_id text,client_id text,company_code text,workflow_id text,definition jsonb,definition_hash text);
+create table flux_private.mail_artifacts(source_id text,id text,stage text,occurred_at timestamptz,status text,body jsonb,content_hash text);
+create function flux_private.mail_plan_gate(p flux_private.mail_pipelines) returns boolean language sql as $$select coalesce((p.definition->>'active')::boolean,false)$$;
+
+create table public.flux_runtime_workflows(client_id text,id text,state text,definition jsonb);

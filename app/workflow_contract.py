@@ -37,6 +37,7 @@ def validate(session,w):
  def add(rule,message,node=None,paths=None,**kw):
   g=nodes.get(node,{}).get('data',{}).get('guided',{})
   findings.extend(enrich(session,[{'rule_id':rule,'message':message,'field_paths':paths or [],'blocks_publish':True,**kw}],g,node,w['id']))
+ if any(n['data']['guided'].get('builder_version')==2 for n in nodes.values()) and len(w.get('entry_nodes') or list(nodes)[:1])!=1:add('single-entry-required','Choose exactly one entry node',paths=['entry_nodes'])
  if not nodes:add('workflow-empty','Add at least one agent before publication',paths=['nodes'])
  for e in edges:
   a,b=e.get('source'),e.get('target');outcome=e.get('sourceHandle')
@@ -53,7 +54,7 @@ def validate(session,w):
  bindings={}
  for nid,node in nodes.items():
   guide=node['data']['guided'];record=field(guide,'output.record_type');pin=field(guide,'output.schema');resource=session.resources.get(pin)
-  if not record or not resource:continue
+  if not record or record in ('none','custom_needs_schema') or not resource:continue
   previous=bindings.get(record)
   if previous and previous['content_hash']!=resource['content_hash']:
    add('record-type-schema-conflict',record+' is already bound to schema '+previous['schema_id']+' by node '+previous['node_id'],nid,['output.record_type'],record_type=record,source_schema={'id':previous['schema_id'],'content_hash':previous['content_hash']},target_schema={'id':pin,'content_hash':resource['content_hash']},conflicting_node_id=previous['node_id'])

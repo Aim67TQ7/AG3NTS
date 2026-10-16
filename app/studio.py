@@ -88,6 +88,8 @@ def blockers(cap,fields,cat,require_all=True):
                 v=values.get(f['id']);ids={o['id'] for o in f['options']}
                 if v not in ids:out.append({'id':'missing-'+f['id'],'step':step['id'],'field':f['id'],'message':'Choose '+f['label'].lower()+'.'})
                 if decision_locked(f['id'],cap,v,cat) and v is not None and not trusted_decision(f['id'],fields.get(f['id'],{})):out.append({'id':'human-'+f['id'],'step':step['id'],'message':'This decision must come from you.'})
+    if fields.get('execute.model_access',{}).get('value') not in (None,'off') and any(v.get('source')=='proposed' for v in fields.values()):
+        out.append({'id':'proposed-choices','step':'review','message':'Confirm proposed choices in the browser before publication.'})
     for rule in cat['rules']:
         if applies(rule['when'],cap,values) and not all(applies(c,cap,values) for c in rule['checks']):out.append({k:rule[k] for k in ('id','step','message')})
     return out
@@ -150,7 +152,7 @@ async def build_definition(g):
         if key not in FIELDS:raise Invalid('Unknown dropdown field')
         options=next(x['options'] for s in c['steps'] for x in s['fields'] if x['id']==key)
         if f.get('value') is not None and f['value'] not in {o['id'] for o in options}:raise Invalid('Dropdown value unavailable: '+key)
-        if decision_locked(key,g['capability'],f.get('value'),c) and f.get('value') is not None and not trusted_decision(key,f):raise Invalid('Human decision provenance required: '+key)
+        if decision_locked(key,g['capability'],f.get('value'),c) and f.get('value') is not None and f.get('source')!='proposed' and not trusted_decision(key,f):raise Invalid('Human decision provenance required: '+key)
     resources=await store.records('resources');refs=[]
     def resolve(field,default):
         v=g.get('fields',{}).get(field,{}).get('value')

@@ -34,7 +34,12 @@ for tool in TOOLS:
 for tool in TOOLS:
  if tool['name']=='update_agent_draft':
   tool['inputSchema']['properties']['connection_requirements']={'type':'array','items':build_changes.CONNECTION,'maxItems':20}
-TOOLS+=build_changes.TOOLS
+from . import mcp_v2
+TOOLS+=build_changes.TOOLS+mcp_v2.TOOLS
+for tool in TOOLS:
+ if tool['name'] in ('read_workflow','read_agent_draft','read_resource'):
+  tool['inputSchema']['properties']['detail']=mcp_v2.DETAIL
+AGENT['properties'].update(bindings={'type':'object','properties':{'reads':{'type':'object'},'writes':{'type':'object'}},'additionalProperties':False},input_config={'type':'object'},trigger_config={'type':'object'},fixtures={'type':'array','maxItems':20,'items':mcp_v2.FIXTURE},mapping={'type':'object','additionalProperties':STR},class_list={'type':'array','maxItems':100,'items':STR},message_template={'type':'string','minLength':1,'maxLength':10000})
 NAMES={t['name'] for t in TOOLS}|{'submit_agent_draft','read_workflow','builder_context','submit_workflow_plan'}
 
 def strict_json(value):
@@ -44,15 +49,9 @@ def strict_json(value):
  from .mcp_connection import no_secrets
  no_secrets(value)
 def validate_rule(checks):
- if not isinstance(checks,list) or not 1<=len(checks)<=50:fail('invalid_rule','A rule needs 1–50 structured checks',field_path='rule')
- for i,c in enumerate(checks):
-  path='rule['+str(i)+']';op=c.get('op') if isinstance(c,dict) else None
-  allowed={'present':{'field','op'},'equals':{'field','op','value'},'within_tolerance':{'field','op','baseline_field','absolute_tolerance'}}
-  if op not in allowed or set(c)!=allowed[op]:fail('invalid_rule','Use present(field), equals(field,value), or within_tolerance(field,baseline_field,absolute_tolerance)',field_path=path)
-  for k in ('field','baseline_field'):
-   if k in c and (not isinstance(c[k],str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*',c[k])):fail('invalid_rule','Use a bounded dotted field path',field_path=path+'.'+k)
-  if op=='within_tolerance' and (type(c['absolute_tolerance']) not in (int,float) or not math.isfinite(c['absolute_tolerance']) or c['absolute_tolerance']<0):fail('invalid_rule','Tolerance must be an explicit finite nonnegative number',field_path=path+'.absolute_tolerance')
- return checks
+ from .rule_language import validate
+ try:return validate(checks)
+ except ValueError as e:fail('invalid_rule',str(e),field_path='rule',required_key='op')
 async def rpc(store,action,args=None):
  c=fresh.CTX.get();b=dict(args or {})
  if c['token'].startswith('fmca_'):b['access_token']=c['token'];headers={'apikey':fresh.KEY}
@@ -65,7 +64,7 @@ async def rpc(store,action,args=None):
   message='Builder operation denied or unavailable'
   if code=='conflict':
    message='request_id was already used; retry the original content or use a new UUID' if 'request_id' in reason else 'Resource version already has different content; choose a new version' if 'immutable resource' in reason else 'Draft or source changed; read the current revision and reconcile before retrying'
-  fail(code,message,database_code=e.get('code'))
+  fail(code,message)
  return r.json()
 def ref(kind,tenant,id,version):return kind+':'+tenant+'.'+id+'@'+version
 class Session:
@@ -111,17 +110,17 @@ class Session:
    if protected and value is not None and key not in ('identity.owner','identity.environment') and value!=old.get('value'):locked.append({'field_path':key,'submitted_value':value})
    if key=='identity.environment' and value not in (None,'TEST'):fail('human_decision_required','MCP drafts are TEST-only',field_path=key)
    out[key]=old if existing and value==old.get('value') else {'value':value,'why':why,'source':'model' if value is not None else 'missing'}
-  if locked:fail('human_decision_required','Confirm all listed protected choices in the browser, then retry',field_path=locked[0]['field_path'],submitted_value=locked[0]['submitted_value'],locked_fields=locked)
+  for rejected in locked:out[rejected['field_path']]['source']='proposed'
   for key in specs:out.setdefault(key,{'value':None,'why':'Human choice required','source':'missing'})
   out['identity.owner']={'value':self.ctx['user']['id'],'source':'verified_identity','why':'Authenticated connection identity'}
   out['identity.company']={'value':self.ctx['company']['code'],'source':'server','why':'Connection company'}
-  out['identity.environment']={'value':'TEST','source':'server','why':'Proposal-only environment'}
+  out['identity.environment']={'value':'TEST','source':'proposed' if 'identity.environment' in patch else 'server','why':'Proposal-only TEST environment; confirm in browser'}
   return out
  def guided(self,a,id):
   from jsonschema import validate,ValidationError
   try:validate(a,AGENT)
   except ValidationError as e:fail('invalid_agent',e.message,field_path='agent.'+'.'.join(map(str,e.absolute_path)))
-  return {'id':id,'version':'0.1.0','name':a['name_options'][0],'responsibility':a['responsibility_options'][0],'name_options':a['name_options'],'responsibility_options':a['responsibility_options'],'capability':a['capability'],'fields':self.fields(a['fields'],capability=a['capability']),'connection_requirements':a.get('connection_requirements',[]),'questions_for_user':a.get('questions_for_user',[]),'catalog_version':studio.CATALOG['version'],'guide_version':studio.CATALOG['guide_version'],'input_config':{'kind':'flux'},'trigger_config':{'kind':'webhook','source':'flux','delivery':'webhook','timezone':'America/Chicago'},'user_edits':[]}
+  return {'id':id,'version':'0.1.0','name':a['name_options'][0],'responsibility':a['responsibility_options'][0],'name_options':a['name_options'],'responsibility_options':a['responsibility_options'],'capability':a['capability'],'fields':self.fields(a['fields'],capability=a['capability']),'connection_requirements':a.get('connection_requirements',[]),'questions_for_user':a.get('questions_for_user',[]),'catalog_version':studio.CATALOG['version'],'guide_version':studio.CATALOG['guide_version'],'input_config':{'kind':'flux'},'trigger_config':{'kind':'webhook','source':'flux','delivery':'webhook','timezone':'America/Chicago'},'user_edits':[],'fixtures':a.get('fixtures',[]),'mapping':a.get('mapping',{}),'class_list':a.get('class_list',[]),'message_template':a.get('message_template'),'builder_version':2,'bindings':a.get('bindings',{}),**{k:copy.deepcopy(a[k]) for k in ('trigger_config','input_config') if k in a}}
  def validation(self,g):
   cat=self.catalog();base=studio.blockers(g['capability'],g.get('fields',{}),cat);findings=[];by={r['id']:r for r in cat['rules']}
   for b in base:
@@ -134,10 +133,10 @@ class Session:
    if r and r['status']!='approved':findings.append({'rule_id':'dependency-not-approved','field_paths':[key],'resource_id':value,'message':'Review and approve this exact resource version in Resources.','blocks_publish':True})
    if r and r['kind']=='rules' and isinstance(r['content'],list) and any(isinstance(c,dict) and c.get('op')=='within_tolerance' for c in r['content']):findings.append({'rule_id':'rule-runtime-support','field_paths':[key],'message':'Tolerance rules are planning artifacts. Certify a supported runtime implementation before publication.','blocks_publish':True})
   from .workflow_contract import enrich
-  findings=enrich(self,findings+build_changes.connection_findings(self,g),g)
+  findings=enrich(self,findings+build_changes.connection_findings(self,g)+(mcp_v2.completeness(self,g) if g.get('builder_version')==2 else []),g)
   return {'valid':not findings,'blocks_publish':bool(findings),'findings':findings,'catalog_version':cat['version'],'catalog_rule_count':len(cat['rules']),'definition_hash':digest(g),'validation_scope':'Six-function design contract and dependencies; runtime certification still required','runtime_certified':False}
  def touch(self,kind,id,body,**extra):
-  old=self.state[kind].get(id);record={**(old or {}),'id':id,'kind':kind,'body':copy.deepcopy(body),'revision':(old or {}).get('revision',0)+1,'content_hash':digest(body),'review_status':'awaiting_user_review','proposal_id':(old or {}).get('proposal_id',str(uuid.uuid5(uuid.NAMESPACE_URL,':'.join([self.ctx['client']['id'],self.ctx['company']['id'],self.ctx['user']['id'],kind,id])))),**extra}
+  old=self.state[kind].get(id);record={**(old or {}),'created_at':(old or {}).get('created_at',self.store.now()),'id':id,'kind':kind,'body':copy.deepcopy(body),'revision':(old or {}).get('revision',0)+1,'content_hash':digest(body),'review_status':'awaiting_user_review','proposal_id':(old or {}).get('proposal_id',str(uuid.uuid5(uuid.NAMESPACE_URL,':'.join([self.ctx['client']['id'],self.ctx['company']['id'],self.ctx['user']['id'],kind,id])))),**extra}
   
   for key in ('applied_result','applied_hash','approved_by','approved_at','reviewed_by','reviewed_at'):record.pop(key,None)
   self.state[kind][id]=record;self.changed[(kind,id)]=record;return record
@@ -191,11 +190,11 @@ class Session:
    self.state['agents'].setdefault(g['id'],{'id':g['id'],'kind':'agents','body':copy.deepcopy(g),'revision':0,'content_hash':digest(g),'review_status':'requires_renewed_review'})
   return r
  def agent_result(self,r):
-  result={k:r[k] for k in ('id','revision','content_hash','review_status')};result.update(draft_id=r['id'],draft=copy.deepcopy(r['body']),validation=self.validation(r['body']),activation_enabled=False,review_url='/ai-connections')
+  result={k:r[k] for k in ('id','revision','content_hash','review_status')};result.update(draft_id=r['id'],draft=copy.deepcopy(r['body']),validation=self.validation(r['body']),activation_enabled=False,review_url='/ai-connections',proposal_id=r.get('proposal_id'))
   if r.get('workflow_id'):result.update({k:r[k] for k in ('workflow_id','node_id','position') if k in r})
   for w in self.state['workflows'].values():
    n=next((n for n in w['body'].get('nodes',[]) if n['data']['guided']['id']==r['id']),None)
-   if n:result.update(workflow_id=w['id'],node_id=n['id'],position=n['position'],workflow_content_hash=w['content_hash'],proposal_id=w.get('proposal_id'));break
+   if n:result.update(workflow_id=w['id'],node_id=n['id'],position=n['position'],workflow_content_hash=w['content_hash'],workflow_proposal_id=w.get('proposal_id'));break
   return result
  def pending_proposals(self,w):
   result=[]
@@ -238,15 +237,16 @@ class Session:
   return findings
  def workflow_result(self,r):
   from .workflow_contract import validate
-  w=copy.deepcopy(r['body'])
-  return {**w,'workflow_id':r['id'],'revision':r['revision'],'content_hash':r['content_hash'],'proposal_id':r.get('proposal_id'),'review_status':r['review_status'],'validation':validate(self,w),'pending_proposals':self.pending_proposals(w),'activation_enabled':False}
+  w=mcp_v2.latest_workflow(self,r)['body'];resolved_hash=digest(w)
+  return {**w,'resolved_content_hash':resolved_hash,'snapshot_content_hash':r['content_hash'],'workflow_id':r['id'],'revision':r['revision'],'content_hash':r['content_hash'],'proposal_id':r.get('proposal_id'),'review_status':r['review_status'],'validation':validate(self,w),'pending_proposals':self.pending_proposals(w),'activation_enabled':False}
  def new_workflow(self,id,name):
   return {'id':id,'name':name,'version':'0.0.1','nodes':[],'edges':[],'binding_mode':'records','format':'canvas-v2','status':'draft','execution_enabled':False,'tenant':self.ctx['client']['id'],'company':self.ctx['company']['code'],'facility':self.ctx['company']['facility'],'actor':self.ctx['user']['id']}
  def check_hash(self,r,expected):
   if expected!=r['content_hash']:fail('conflict','Draft changed; read its current hash before retrying',expected_hash=expected,current_hash=r['content_hash'],revision=r['revision'])
  def placement(self,w,g):
   node_id=str(uuid.uuid5(uuid.NAMESPACE_URL,w['id']+':'+g['id']));old=next((n for n in w['nodes'] if n['id']==node_id),None)
-  if old:return old
+  if old:
+   old['data'].update(guided=copy.deepcopy(g),guided_hash=digest(g),power='Off');return old
   x=max([n['position']['x'] for n in w['nodes']],default=-260)+360;node={'id':node_id,'type':'capability','position':{'x':x,'y':120},'data':{'guided':copy.deepcopy(g),'guided_hash':digest(g),'capability':g['capability'],'status':'Choices needed','power':'Off'}};w['nodes'].append(node);return node
  async def source(self,source):
   kind=source.get('kind')
@@ -301,6 +301,7 @@ async def dispatch(name,args,store):
  snap=active.snapshot if active else await rpc(store,'snapshot',{'request_id':request_id,'request_hash':request_hash} if request_id else {})
  if not active and snap.get('cached'):return snap['response']
  s=active or Session(store,snap)
+ if name in mcp_v2.NAMES:return await mcp_v2.handle(name,args,store,s)
  if name in build_changes.NAMES:return await build_changes.handle(name,args,store,s)
  if name=='list_resources':
   rows=[{k:v for k,v in r.items() if k!='content'} for r in sorted(s.resources.values(),key=lambda r:r['id']) if (not args.get('kind') or r['kind']==args['kind']) and (not args.get('status') or r['status']==args['status'])];offset=args.get('offset',0);limit=args.get('limit',25)
@@ -308,12 +309,14 @@ async def dispatch(name,args,store):
  if name=='read_resource':
   r=s.resources.get(args['id'])
   if not r:fail('not_found','Resource is unavailable in this company',resource_id=args['id'])
-  return r
+  return {k:v for k,v in r.items() if k!='content'} if args.get('detail')=='summary' else r
  if name=='builder_context':
   from .mcp_connection import identity,rpc as old_rpc
-  return {'identity':identity(),'profile':await old_rpc(store,'mcp_profile',{'access_token':s.ctx['token']}),'catalog':s.catalog(),'catalog_hash':digest(studio.CATALOG),'resources':[{**{k:v for k,v in r.items() if k!='content'},**({'schema':r['content']} if r['kind']=='schema' else {})} for r in sorted(s.resources.values(),key=lambda r:r['id'])],'instructions':'One responsibility per agent. Use exact catalog IDs and resource pins. Invalid values are rejected. Publication, credentials and activation require human review in FLUX. Drafts remain TEST and Off.'}
- if name=='read_agent_draft':return s.agent_result(s.agent(args['draft_id']))
- if name=='read_workflow':return s.workflow_result(s.workflow(args['workflow_id']))
+  return {'identity':identity(),'profile':await old_rpc(store,'mcp_profile',{'access_token':s.ctx['token']}),'catalog':s.catalog(),'catalog_hash':digest(studio.CATALOG),'resources':[{**{k:v for k,v in r.items() if k!='content'},**({'schema':r['content']} if r['kind']=='schema' and args.get('detail')!='summary' else {'title':r['content'].get('title'),'required':r['content'].get('required',[])} if r['kind']=='schema' else {})} for r in sorted(s.resources.values(),key=lambda r:r['id'])],'completeness_matrix':mcp_v2.COMPLETENESS,'secret_kinds':[{'id':k,'required_fields':v[0],'scopes':v[1]} for k,v in mcp_v2.SECRET_KINDS.items()],'connections':s.snapshot.get('connections',[]),'templates':[r for r in s.resources.values() if r['kind']=='template'],'instructions':'One responsibility per agent. Use exact catalog IDs and resource pins. Invalid values are rejected. Publication, credentials and activation require human review in FLUX. Drafts remain TEST and Off.'}
+ if name=='read_agent_draft':
+  r=s.agent_result(s.agent(args['draft_id']));return mcp_v2.compact_result(r,'agent') if args.get('detail')=='summary' else r
+ if name=='read_workflow':
+  r=s.workflow_result(s.workflow(args['workflow_id']));return mcp_v2.compact_result(r,'workflow') if args.get('detail')=='summary' else r
  if name=='submit_agent_draft':
   id='draft-mcp-'+request_id;g=s.guided(args['agent'],id);r=s.touch('agents',id,g);w=s.new_workflow('canvas-mcp-'+request_id,g['name']+' workflow');s.placement(w,g);s.touch('workflows',w['id'],w);result=s.agent_result(r)
  elif name=='update_agent_draft':
@@ -331,7 +334,7 @@ async def dispatch(name,args,store):
   result=s.agent_result(r)
  elif name in ('propose_connected_workflow','propose_connections'):
   if args.get('workflow_id'):
-   old=s.workflow(args['workflow_id'],write=True);s.check_hash(old,args.get('expected_hash'));w=copy.deepcopy(old['body'])
+   old=s.workflow(args['workflow_id'],write=True);s.check_hash(old,args.get('expected_hash'));w=mcp_v2.latest_workflow(s,old)['body'];w.pop('resolved_drafts',None)
   else:
    if args.get('expected_hash'):fail('invalid_request','expected_hash requires workflow_id')
    w=s.new_workflow('canvas-mcp-'+request_id,args['name'])
@@ -348,7 +351,7 @@ async def dispatch(name,args,store):
   if len(w['nodes'])>100 or len(w['edges'])>100:fail('workflow_too_large','Use at most 100 nodes and edges')
   if 'entry_nodes' in args:w['entry_nodes']=[aliases.get(k,k) for k in args['entry_nodes']]
   if 'terminal_outcomes' in args:w['terminal_outcomes']=[{**x,'node':aliases.get(x['node'],x['node'])} for x in args['terminal_outcomes']]
-  r=s.touch('workflows',w['id'],w);result=s.workflow_result(r);result['drafts']=[s.agent_result(s.agent(n['data']['guided']['id'])) for n in w['nodes']]
+  r=s.touch('workflows',w['id'],w);result=s.workflow_result(r);result['node_keys']=aliases;result['drafts']=[s.agent_result(s.agent(n['data']['guided']['id'])) for n in w['nodes']]
  elif name in ('propose_schema','propose_rule'):
   kind='schema' if name=='propose_schema' else 'rules';id=args['resource_id'];version=args['version']
   if not re.fullmatch(r'[a-z][a-z0-9-]{2,63}',id) or not re.fullmatch(r'\d+\.\d+\.\d+',version):fail('invalid_resource_identity','Use a lowercase slug only, no tenant prefix (3–64 characters), and semantic version',field_path='resource_id/version')
@@ -369,7 +372,7 @@ async def dispatch(name,args,store):
  else:fail('unknown_tool','Unknown builder tool')
  return result if active else await s.commit(name,args,result)
 
-async def review(store,proposal,approve,expected_hash,expected_record_revision=None):
+async def review(store,proposal,approve,expected_hash,expected_record_revision=None,confirm_proposed=False,approve_resources=False):
  if fresh.CTX.get()['token'].startswith('fmca_'):fail('access_denied','Human browser review required')
  snap=await rpc(store,'snapshot');s=Session(store,snap);kind=proposal['record_kind'];id=proposal['record_id'];r=s.state[kind].get(id)
  if not r:fail('not_found','Proposal is unavailable')
@@ -379,15 +382,22 @@ async def review(store,proposal,approve,expected_hash,expected_record_revision=N
  if approve and kind=='waivers' and s.ctx['role']!='owner':fail('access_denied','Only this client owner can authorize a discovery waiver')
  if approve and kind=='plans':await s.source(r['body']['source'])
  if approve and kind=='workflows':s.workflow_result(r) # Refresh authoritative findings; incomplete design may be applied Off.
- payload={'record_kind':kind,'record_id':id,'expected_hash':expected_hash,'expected_revision':snap['revision'],'approve':approve}
- if approve and kind=='workflows':payload['native_body']=prepare_canvas(s,r)
+ payload={'record_kind':kind,'record_id':id,'expected_hash':expected_hash,'expected_revision':snap['revision'],'approve':approve,'confirm_proposed':confirm_proposed,'approve_resources':approve_resources}
+ if approve and kind=='workflows':payload['native_body']=prepare_canvas(s,r,confirm_proposed)
  if approve and kind=='change_sets':
-  candidate=build_changes.candidate_session(store,snap,r);payload['native_bodies']={x['id']:prepare_canvas(candidate,candidate.state['workflows'][x['id']]) for x in r['body']['changes'] if x['kind']=='workflows'}
+  candidate=build_changes.candidate_session(store,snap,r);payload['native_bodies']={x['id']:prepare_canvas(candidate,candidate.state['workflows'][x['id']],confirm_proposed) for x in r['body']['changes'] if x['kind']=='workflows'}
+ payload['confirmed_agent_hashes']={g['id']:digest(g) for body in ([payload['native_body']] if 'native_body' in payload else payload.get('native_bodies',{}).values()) for n in body.get('nodes',[]) for g in [n['data']['guided']]}
+ payload['resource_hashes']={pin:digest(rec['body']['content']) for pin,rec in (candidate.state['resources'] if approve and kind=='change_sets' else s.state['resources']).items()}
  return await rpc(store,'review',payload)
 
 
-def prepare_canvas(s,r):
+def prepare_canvas(s,r,confirm_proposed=False):
  canvas=copy.deepcopy(r['body']);canvas.pop('content_hash',None)
+ if confirm_proposed:
+  for n in canvas.get('nodes',[]):
+   for f in n['data']['guided'].get('fields',{}).values():
+    if f.get('source')=='proposed':f['source']='user'
+   n['data'].pop('guided_hash',None)
  prior=next((w['body'] for w in s.snapshot.get('workflows',[]) if w['path']==r.get('native_source',{}).get('path')),None)
  version=prior['version'].rsplit('.',1)[0]+'.'+str(int(prior['version'].rsplit('.',1)[1])+1) if prior else '0.0.'+str(r['revision'])
  canvas.update(version=version,draft_revision=version,release_version=None,format='canvas-v2',created_at=s.store.now(),actor=s.ctx['user']['id'],status='draft',execution_enabled=False);canvas['content_hash']=digest(canvas)

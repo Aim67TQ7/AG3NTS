@@ -8,7 +8,7 @@ from app.workflow_contract import validate
 class ValidatorFixes(unittest.TestCase):
  def setUp(self):
   self.marker=fresh.CTX.set({'token':'fmca_synthetic','user':{'id':'operator'},'client':{'id':'bunting'},'company':{'id':'company','code':'BMC','name':'BMC'},'role':'editor'})
-  self.session=b.Session(SimpleNamespace(),{'document':{}})
+  self.session=b.Session(SimpleNamespace(now=lambda:'2026-10-16T00:00:00Z'),{'document':{}})
  def tearDown(self):fresh.CTX.reset(self.marker)
  def resource(self,name,content):
   pin='schema:bunting.'+name+'@1.0.0'
@@ -35,18 +35,18 @@ class ValidatorFixes(unittest.TestCase):
   self.assertFalse(any(f['rule_id']=='incompatible-connection' for f in report['findings']))
   w['nodes'][1]['data']['guided']['fields']['output.record_type']['value']='document.classified'
   self.assertFalse(any(f['rule_id'] in ('incompatible-connection','record-type-schema-conflict') for f in validate(self.session,w)['findings']))
- def test_all_protected_fields_returned_together(self):
-  with self.assertRaises(b.BuilderError) as raised:self.session.fields({'execute.authority':'P2','execute.model_access':'sonnet','verify.approval_gate':'single_approver'},capability='WRITE')
-  self.assertEqual({f['field_path'] for f in raised.exception.error['locked_fields']},{'execute.authority','execute.model_access','verify.approval_gate'})
+ def test_all_protected_fields_saved_as_proposed(self):
+  fields=self.session.fields({'execute.authority':'P2','execute.model_access':'sonnet','verify.approval_gate':'single_approver'},capability='WRITE')
+  self.assertEqual({k for k,v in fields.items() if v.get('source')=='proposed'},{'execute.authority','execute.model_access','verify.approval_gate'})
  def test_reason_approval_none_matches_catalog_and_validation(self):
   fields=self.session.fields({'verify.approval_gate':'none'},capability='REASON')
   self.assertEqual(fields['verify.approval_gate']['value'],'none')
   self.assertFalse(any(x['id']=='human-verify.approval_gate' for x in studio.blockers('REASON',fields,self.session.catalog())))
   for cap in ('COMMS','WRITE'):
-   with self.assertRaises(b.BuilderError):self.session.fields({'verify.approval_gate':'none'},capability=cap)
+   self.assertEqual(self.session.fields({'verify.approval_gate':'none'},capability=cap)['verify.approval_gate']['source'],'proposed')
  def test_matching_identity_accepted_but_spoof_denied(self):
   fields=self.session.fields({'identity.owner':'operator','identity.environment':'TEST'},capability='READ')
-  self.assertEqual(fields['identity.owner']['source'],'verified_identity');self.assertEqual(fields['identity.environment']['source'],'server')
+  self.assertEqual(fields['identity.owner']['source'],'verified_identity');self.assertEqual(fields['identity.environment']['source'],'proposed')
   with self.assertRaises(b.BuilderError):self.session.fields({'identity.owner':'someone-else'},capability='READ')
   with self.assertRaises(b.BuilderError):self.session.fields({'identity.environment':'PROD'},capability='READ')
  def test_pending_revision_and_caller_keys_in_schema_error(self):

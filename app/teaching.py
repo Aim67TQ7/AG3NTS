@@ -177,6 +177,8 @@ async def publish(b:dict):
   if digest(r['questions'])!=a['config']['answer_hash'] or digest(r['fixtures'])!=a['config']['fixtures_hash'] or digest(r['guided'])!=a['config']['guided_hash']:raise Invalid('Interview or settings changed; rebuild and test')
   if any(q['resolution']=='open' for q in r['questions']):raise Invalid('Open questions remain')
   if not r['readme_confirmed'] or r.get('readme_hash')!=a['package_hash']:raise Invalid('Confirm this exact README/package')
+  from .fixture_suite import require_publish_evidence
+  await require_publish_evidence(r['guided'],studio.store)
   if not a['adapter_certified']:raise Invalid('Runtime adapter needs certification before publication')
   if not a['config'].get('bindings'):raise Invalid('Configure FLUX record bindings and rebuild before publication')
   graph=await studio.validate_canvas_endpoint(b.get('canvas',{}))

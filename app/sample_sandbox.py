@@ -1,6 +1,9 @@
 """Isolated schema/rule checker. No adapters, credentials, provider calls or runtime execution."""
 import json,math,sys
 from decimal import Decimal
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from rule_language import evaluate,validate
 
 def check(payload):
  if any(key in json.dumps(payload['schema']) for key in ('$ref','$dynamicRef')):raise ValueError('Schema references are disabled')
@@ -12,14 +15,16 @@ def check(payload):
    doc=doc[part]
   return True,doc
  for sample in payload['samples']:
-  doc=sample['document'];errors=[{'field_path':'.'.join(map(str,e.absolute_path)),'constraint':e.validator} for e in validator.iter_errors(doc)];checks=[]
-  for rule in payload['rules']:
-   exists,left=lookup(doc,rule['field']);op=rule['op'];passed=False
-   if op=='present':passed=exists and left is not None
-   elif op=='equals':passed=exists and type(left)==type(rule['value']) and left==rule['value']
-   elif op=='within_tolerance':
-    found,right=lookup(doc,rule['baseline_field']);passed=exists and found and type(left) in (int,float) and type(right) in (int,float) and Decimal(str(left)).is_finite() and Decimal(str(right)).is_finite() and abs(Decimal(str(left))-Decimal(str(right)))<=Decimal(str(rule['absolute_tolerance']))
-   checks.append({'field_path':rule['field'],'operation':op,'passed':passed})
+  doc=sample['document'];errors=[]
+  for e in validator.iter_errors(doc):
+   path='.'.join(map(str,e.absolute_path))
+   if e.validator=='required':
+    for missing in e.validator_value:
+     if isinstance(e.instance,dict) and missing not in e.instance:errors.append({'field_path':(path+'.' if path else '')+missing,'constraint':'required'})
+   else:errors.append({'field_path':path,'constraint':e.validator})
+  validate(payload['rules']) if payload['rules'] else None
+  checks=evaluate(doc,payload['rules'])
+  errors=list({(e['field_path'],e['constraint']):e for e in errors}.values())
   actual={'schema_valid':not errors,'rule_passed':all(c['passed'] for c in checks)};expected=sample['expected'];matches=all(actual[k]==v for k,v in expected.items())
   results.append({'name':sample['name'],'expected':expected,'actual':actual,'matches_expected':matches,'schema_errors':errors,'rule_checks':checks})
  return {'mode':'isolated_schema_and_rule_checks','results':results,'all_expectations_met':all(r['matches_expected'] for r in results),'live_actions':False,'publication_authorized':False}

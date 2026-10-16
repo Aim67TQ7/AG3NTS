@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch,AsyncMock
 from app import mcp_builder as b,mcp_connection as m,fresh,studio
-from app.core import digest
+from app.core import digest,Invalid
 ROOT=Path(__file__).resolve().parents[2]
 NODE=os.environ.get('FLUX_TEST_NODE') or shutil.which('node') or 'node'
 BRIDGE=os.environ.get('FLUX_TEST_PG_BRIDGE',str(ROOT/'tests/postgres/bridge.mjs'))
@@ -21,7 +21,7 @@ class Database:
 class BuilderIntegration(unittest.IsolatedAsyncioTestCase):
  @classmethod
  def setUpClass(cls):
-  cls.db=Database();cls.db.call(exec=(ROOT/'tests/integration/builder_bootstrap.sql').read_text());cls.db.call(exec=(ROOT/'migrations/20261016_mcp_build_sessions.sql').read_text());cls.db.call(exec=__import__('runpy').run_path(str(ROOT/'scripts/generate_builder_lock_sql.py'))['migration_sql']());cls.db.sql('insert into flux_memberships values ($1,$2,$3)',[U,'tenant-a','owner']);cls.db.sql('insert into flux_companies values ($1,$2,$3,$4)',[C,'tenant-a','BMC','500'])
+  cls.db=Database();cls.db.call(exec=(ROOT/'tests/integration/builder_bootstrap.sql').read_text());cls.db.call(exec=(ROOT/'migrations/20261016_mcp_build_sessions.sql').read_text());cls.db.call(exec=__import__('runpy').run_path(str(ROOT/'scripts/generate_builder_lock_sql.py'))['migration_sql']());cls.db.call(exec=(ROOT/'sql/flux_mcp_v2.sql').read_text());cls.db.call(exec=(ROOT/'sql/flux_mcp_v2_environments.sql').read_text());cls.db.sql('insert into flux_memberships values ($1,$2,$3)',[U,'tenant-a','owner']);cls.db.sql('insert into flux_companies values ($1,$2,$3,$4)',[C,'tenant-a','BMC','500'])
  @classmethod
  def tearDownClass(cls):cls.db.close()
  async def asyncSetUp(self):
@@ -29,7 +29,9 @@ class BuilderIntegration(unittest.IsolatedAsyncioTestCase):
   self.ctx={'token':'fmca_synthetic','user':{'id':U,'email':'synthetic@example.invalid'},'role':'owner','client':{'id':'tenant-a','name':'A'},'company':{'id':C,'code':'BMC','facility':'500','name':'BMC'}};self.marker=fresh.CTX.set(self.ctx)
   async def post(url,headers,json):
    args=json['args'];self.last_args=args
-   try:r=self.db.sql('select public.flux_builder_session($1,$2::jsonb) result',[json['action'],__import__('json').dumps(args)]);return SimpleNamespace(status_code=200,json=lambda:r[0]['result'])
+   try:
+    rpc_name='flux_builder_observe' if url.endswith('/flux_builder_observe') else 'flux_builder_session'
+    r=self.db.sql('select public.'+rpc_name+'($1,$2::jsonb) result',[json['action'],__import__('json').dumps(args)]);return SimpleNamespace(status_code=200,json=lambda:r[0]['result'])
    except RuntimeError as e:
     return SimpleNamespace(status_code=400,json=lambda:{'message':str(e),'code':'P0001'})
   self.store=SimpleNamespace(CLIENT=SimpleNamespace(post=post),ACTOR=ContextVar('builder_test_actor',default=U),now=lambda:'2026-10-16T12:00:00Z')
@@ -44,7 +46,7 @@ class BuilderIntegration(unittest.IsolatedAsyncioTestCase):
   saved=await self.call('update_agent_draft',**args);self.assertEqual(saved['revision'],2);self.assertEqual(saved['draft']['fields']['trigger.type'],old['fields']['trigger.type']);self.assertTrue(saved['validation']['blocks_publish']);self.assertEqual(saved,await self.call('update_agent_draft',**args))
   with self.assertRaises(b.BuilderError):await self.call('update_agent_draft',**{**args,'request_id':str(uuid.uuid4())})
   before=self.db.sql('select count(*) n from flux_private.builder_history')[0]['n']
-  for fields in ({'output.record_type':'bogus'},{'not.a.field':'x'},{'identity.owner':OTHER},{'output.record_type':44},{'execute.authority':'P2'}):
+  for fields in ({'output.record_type':'bogus'},{'not.a.field':'x'},{'identity.owner':OTHER},{'output.record_type':44}):
    with self.assertRaises(b.BuilderError):await self.call('update_agent_draft',**{**args,'request_id':str(uuid.uuid4()),'expected_hash':saved['content_hash'],'fields':fields})
   self.assertEqual(before,self.db.sql('select count(*) n from flux_private.builder_history')[0]['n']);self.assertEqual((await self.call('read_agent_draft',draft_id=id))['content_hash'],saved['content_hash'])
  async def test_seven_step_atomic_connected_and_browser_apply(self):
@@ -195,7 +197,7 @@ class BuilderIntegration(unittest.IsolatedAsyncioTestCase):
  async def test_connection_permissions_projection_and_secrets_exclusion(self):
   id=str(uuid.uuid4());credential='credential-'+uuid.uuid4().hex[:8];self.db.sql('insert into flux_app_objects(client_id,path,body) values($1,$2,$3::jsonb)',['tenant-a','library-tenant-a/'+credential+'--1.0.0.json',json.dumps({'id':credential,'version':'1.0.0','kind':'credential','encrypted_value':'SYNTHETIC-CIPHERTEXT','company':'BMC'})]);self.ctx['token']='flx_browser'
   await b.rpc(self.store,'approve_connection',{'id':id,'request_id':str(uuid.uuid4()),'credential_id':credential,'credential_version':'1.0.0','system':'epicor_rest','capabilities':['epicor.read']});connections=await self.call('list_connections');self.assertNotIn('SYNTHETIC-CIPHERTEXT',json.dumps(connections));self.assertNotIn('credential_path',json.dumps(connections))
-  agent=self.agent();agent['connection_requirements']=[{'connection_id':id,'capabilities':['epicor.write']}];a=await self.call('submit_agent_draft',request_id=str(uuid.uuid4()),agent=agent);f=next(f for f in a['validation']['findings'] if f['rule_id']=='connection-permission-required');self.assertEqual(f['missing_permissions'],['epicor.write'])
+  agent=self.agent();agent['connection_requirements']=[{'connection_id':id,'capabilities':['epicor.write']}];a=await self.call('submit_agent_draft',request_id=str(uuid.uuid4()),agent=agent);f=next(f for f in a['validation']['findings'] if f['rule_id']=='connection-permission-required');self.assertEqual(f['missing_permissions'],['epicor.write','read_only_capabilities'])
   with self.assertRaises(Exception):await self.call('submit_agent_draft',request_id=str(uuid.uuid4()),agent={**self.agent(),'questions_for_user':['password=do-not-save']})
   await b.rpc(self.store,'revoke_connection',{'id':id,'request_id':str(uuid.uuid4())});self.assertFalse(any(c['id']==id for c in (await self.call('list_connections'))['items']))
  async def test_catalog_lock_policy_matches_database_for_every_option(self):
@@ -214,3 +216,127 @@ class BuilderIntegration(unittest.IsolatedAsyncioTestCase):
    fields['execute.model_access']={'value':'sonnet','source':'model','why':'Synthetic attempted bypass'};return fields
   with patch.object(b.Session,'fields',bypass):
    with self.assertRaises(b.BuilderError):await self.call('submit_agent_draft',request_id=str(uuid.uuid4()),agent=a)
+ async def test_v2_proposed_fields_require_explicit_browser_confirmation(self):
+  agent=self.agent(**{'execute.authority':'P2','execute.model_access':'sonnet','verify.approval_gate':'none'});agent['capability']='REASON'
+  draft=await self.call('submit_agent_draft',request_id=str(uuid.uuid4()),agent=agent)
+  self.assertEqual(draft['draft']['fields']['execute.model_access']['source'],'proposed')
+  workflow=await self.call('read_workflow',workflow_id=draft['workflow_id']);self.ctx['token']='flx_browser'
+  result=await b.review(self.store,{'record_kind':'workflows','record_id':workflow['id']},True,workflow['content_hash'],confirm_proposed=True)
+  fields=result['canvas']['nodes'][0]['data']['guided']['fields']
+  self.assertEqual(fields['execute.model_access']['source'],'user');self.assertFalse(result['canvas']['execution_enabled'])
+  reread=await self.call('read_agent_draft',draft_id=draft['draft_id']);self.assertEqual(reread['draft']['fields']['execute.authority']['source'],'user')
+ async def test_v2_runtime_reads_enforce_current_permission_company_and_facility(self):
+  wid='runtime-'+uuid.uuid4().hex;job=str(uuid.uuid4());other=str(uuid.uuid4())
+  body={'id':wid,'version':'0.0.1','tenant':'tenant-a','company':'BMC','facility':'500'};body['content_hash']=digest(body)
+  self.db.sql('insert into flux_app_objects values($1,$2,$3,clock_timestamp())',['tenant-a','workflows/'+wid+'--0.0.1.json',json.dumps(body)])
+  definition={'steps':[{'config':{'scope':{'company':'BMC','facility':'500'}}}]}
+  for jid,co in ((job,'BMC'),(other,'OTHER')):
+   d=copy.deepcopy(definition);d['steps'][0]['config']['scope']['company']=co
+   self.db.sql("insert into flux_runtime_jobs(id,client_id,workflow_id,definition,definition_hash,result,status,test_run,created_at) values($1,'tenant-a',$2,$3,'hash',$4,'review_required',true,now())",[jid,wid,json.dumps(d),json.dumps({'output':{'invoice':'synthetic','contentBytes':'DO_NOT_RETURN_BYTES'},'error':'sample'})])
+  result=await self.call('list_runs',workflow_id=wid,outcome='REVIEW_REQUIRED');self.assertEqual([x['id'] for x in result['items']],['job:'+job])
+  read=await self.call('read_run',run_id='job:'+job);self.assertNotIn('DO_NOT_RETURN_BYTES',json.dumps(read));self.assertEqual(read['result']['output']['invoice'],'synthetic')
+  with self.assertRaises(b.BuilderError):await self.call('read_run',run_id='job:'+other)
+  denied=copy.deepcopy(body);denied['deny']='view'
+  self.db.sql('insert into flux_app_objects values($1,$2,$3,clock_timestamp())',['tenant-a','workflows/'+wid+'--0.0.2.json',json.dumps(denied)])
+  with self.assertRaises(b.BuilderError):await self.call('read_run',run_id='job:'+job)
+ async def test_v2_one_atomic_set_references_schemas_instructions_and_protected_fields(self):
+  rid=str(uuid.uuid4());shape={'type':'object','properties':{'value':{'type':'string'}}}
+  a=self.agent(**{'input.schema':'$schema:shape','output.schema':'$schema:shape','execute.instructions':'$instructions:procedure','execute.authority':'P0','execute.model_access':'sonnet','verify.approval_gate':'none'});a['capability']='REASON'
+  operations=[{'key':'shape','tool':'propose_schema','arguments':{'resource_id':'shape-'+uuid.uuid4().hex[:8],'version':'1.0.0','label':'Synthetic schema','schema':shape}},{'key':'procedure','tool':'propose_instructions','arguments':{'resource_id':'instructions-'+uuid.uuid4().hex[:8],'version':'1.0.0','label':'Synthetic instructions','text':'Copy supplied evidence; send uncertainty to review.','model_contract':{'output_schema':'$schema:shape','max_tokens':100,'refusal_behavior':'REVIEW_REQUIRED','prompt_version':'1.0.0'}}},{'key':'workflow','tool':'propose_connected_workflow','arguments':{'name':'Atomic v2','nodes':[{'key':'reason','agent':a}],'edges':[],'entry_nodes':['reason'],'terminal_outcomes':[{'node':'reason','outcome':'COMPLETED','destination':'terminal'}]}}]
+  result=await self.call('propose_change_set',request_id=rid,title='Atomic full design',operations=operations)
+  read=await self.call('read_change_set',proposal_id=result['proposal_id']);self.assertEqual(read['content_hash'],result['content_hash'])
+  self.ctx['token']='flx_browser';applied=await b.review(self.store,{'record_kind':'change_sets','record_id':result['id']},True,result['content_hash'],confirm_proposed=True,approve_resources=True)
+  self.assertFalse(applied['activation_enabled']);resources=self.db.sql("select body from flux_app_objects where client_id='tenant-a' and path like 'resources/%' and body->>'label' in ('Synthetic schema','Synthetic instructions')")
+  self.assertEqual(len(resources),2)
+ async def test_v2_proposal_summary_reads_and_offline_fixture_suite(self):
+  shape=await self.call('propose_schema',request_id=str(uuid.uuid4()),resource_id='fixture-'+uuid.uuid4().hex[:8],version='1.0.0',label='Synthetic fixture shape',schema={'type':'object','properties':{'value':{'type':'string'}}})
+  agent=self.agent(**{'input.schema':shape['id'],'output.schema':shape['id']});agent['capability']='MAP';agent['mapping']={'value':'value'};agent['fixtures']=[{'name':'copy','input':{'value':'sample'},'expected':{'outcome':'COMPLETED','fields':{'value':'sample'}}}]
+  draft=await self.call('submit_agent_draft',request_id=str(uuid.uuid4()),agent=agent)
+  proposals=await self.call('list_proposals');self.assertTrue(any(x['proposal_id']==shape['proposal_id'] for x in proposals['items']))
+  compact=await self.call('read_agent_draft',draft_id=draft['draft_id'],detail='summary');self.assertNotIn('why',json.dumps(compact['draft']))
+  workflow=await self.call('read_workflow',workflow_id=draft['workflow_id']);suite=await self.call('run_fixture_suite',request_id=str(uuid.uuid4()),workflow_id=workflow['id'],expected_hash=workflow['content_hash'])
+  self.assertTrue(suite['passed']);self.assertEqual(suite['cost_usd'],0);self.assertFalse(suite['live_actions'])
+  current=await self.call('read_workflow',workflow_id=workflow['id'])
+  spec=b.mcp_v2.SECRET_KINDS['graph_app']
+  prod=await self.call('propose_secret_request',request_id=str(uuid.uuid4()),key='prod-'+uuid.uuid4().hex[:8],secret_kind='graph_app',purpose='Synthetic PROD request only',systems=['outlook_graph'],scopes=['mail.read'],environment='PROD',accountable_role='Synthetic owner',rotation_days=90,used_by_nodes=['reader'],fields_required=spec[0],test_workflow_id=current['id'],test_workflow_hash=current['content_hash'])
+  self.assertEqual((await self.call('read_proposal',id=prod['proposal_id']))['body']['content']['environment'],'PROD')
+ async def test_v2_secret_requests_dedupe_and_never_accept_values(self):
+  args={'resource_id':'request-'+uuid.uuid4().hex[:8],'version':'1.0.0','label':'Synthetic Epicor TEST request','secret_kind':'epicor_rest_basic','purpose':'Read synthetic PO','systems':['epicor_rest'],'scopes':['epicor.read'],'environment':'TEST','accountable_role':'ERP administrator','rotation_days':90,'used_by_nodes':['reader'],'fields_required':['base_url','company_code','username','password','api_key','allowed_paths']}
+  one=await self.call('propose_secret_request',request_id=str(uuid.uuid4()),**args)
+  two=await self.call('propose_secret_request',request_id=str(uuid.uuid4()),**{**args,'resource_id':'duplicate-'+uuid.uuid4().hex[:8]});self.assertEqual(one['resource_ref'],two['resource_ref']);self.assertTrue(two['deduplicated']);self.assertEqual(one['proposal_id'],two['proposal_id'])
+  with self.assertRaises(b.BuilderError):await self.call('propose_secret_request',request_id=str(uuid.uuid4()),**{**args,'environment':'PROD'})
+  with self.assertRaises(Invalid):await self.call('propose_secret_request',request_id=str(uuid.uuid4()),**{**args,'password':'do-not-store-a-value'})
+ async def test_v2_archive_legacy_snapshot_without_reassigning_agent(self):
+  wid='legacy-'+uuid.uuid4().hex;g={'id':'legacy-reader','capability':'READ','fields':{'identity.owner':{'value':'ssh-owner'},'identity.environment':{'value':'PROD'}}}
+  w={'id':wid,'version':'0.0.1','tenant':'tenant-a','company':'BMC','facility':'500','nodes':[{'id':'node','position':{'x':1,'y':1},'data':{'guided':g}}],'edges':[]};w['content_hash']=digest(w)
+  self.db.sql('insert into flux_app_objects values($1,$2,$3,clock_timestamp())',['tenant-a','workflows/'+wid+'--0.0.1.json',json.dumps(w)])
+  request=await self.call('archive_workflow',request_id=str(uuid.uuid4()),workflow_id=wid,expected_hash=w['content_hash']);self.ctx['token']='flx_browser'
+  await b.review(self.store,{'record_kind':'resources','record_id':request['resource_ref']},True,(await self.call('read_proposal',id=request['proposal_id']))['content_hash'])
+  archived=self.db.sql("select body from flux_app_objects where client_id='tenant-a' and path like 'audit/archive-%' and body->'payload'->>'canvas_id'=$1",[wid]);self.assertEqual(len(archived),1)
+  saved=self.db.sql("select body from flux_app_objects where client_id='tenant-a' and path=$1",['workflows/'+wid+'--0.0.1.json'])[0]['body'];self.assertEqual(saved,w)
+ async def test_v2_pending_read_and_summary_hash_do_not_rewrite_saved_canvas(self):
+  draft=await self.submit();old=await self.call('read_workflow',workflow_id=draft['workflow_id'])
+  updated=await self.call('propose_mapping',request_id=str(uuid.uuid4()),draft_id=draft['draft_id'],expected_hash=draft['content_hash'],fields={'value':'value'}) if draft['draft']['capability']=='MAP' else await self.call('update_agent_draft',request_id=str(uuid.uuid4()),draft_id=draft['draft_id'],expected_hash=draft['content_hash'],fields={'output.next':'none'})
+  current=await self.call('read_workflow',workflow_id=draft['workflow_id'],detail='summary')
+  self.assertEqual(current['nodes'][0]['draft_hash'],updated['content_hash']);self.assertIn('snapshot_content_hash',current);self.assertIn('resolved_content_hash',current)
+ async def test_v2_model_fixture_requires_confirmation_and_replay_never_calls_twice(self):
+  from app import fixture_suite
+  resource=await self.call('propose_schema',request_id=str(uuid.uuid4()),resource_id='model-shape-'+uuid.uuid4().hex[:8],version='1.0.0',label='Model fixture shape',schema={'type':'object','properties':{'value':{'type':'string'}}})
+  instruction=await self.call('propose_instructions',request_id=str(uuid.uuid4()),resource_id='model-procedure-'+uuid.uuid4().hex[:8],version='1.0.0',label='Model fixture procedure',text='Copy the synthetic value.',model_contract={'output_schema':resource['id'],'max_tokens':100,'refusal_behavior':'REVIEW_REQUIRED','prompt_version':'1'})
+  a=self.agent(**{'input.schema':resource['id'],'output.schema':resource['id'],'execute.model_access':'sonnet','execute.cost_ceiling':'0_05','execute.instructions':instruction['resource_ref']});a['capability']='REASON';a['fixtures']=[{'name':'copy','input':{'value':'synthetic'},'expected':{'outcome':'COMPLETED','fields':{'value':'synthetic'},'max_cost_usd':0.05}}]
+  draft=await self.call('submit_agent_draft',request_id=str(uuid.uuid4()),agent=a);workflow=await self.call('read_workflow',workflow_id=draft['workflow_id'])
+  with self.assertRaises(b.BuilderError):await self.call('run_fixture_suite',request_id=str(uuid.uuid4()),workflow_id=workflow['id'],expected_hash=workflow['content_hash'],max_cost_usd=0.05)
+  self.ctx['token']='flx_browser';await b.review(self.store,{'record_kind':'workflows','record_id':workflow['id']},True,workflow['content_hash'],confirm_proposed=True);self.ctx['token']='fmca_synthetic';workflow=await self.call('read_workflow',workflow_id=workflow['id'])
+  args={'request_id':str(uuid.uuid4()),'workflow_id':workflow['id'],'expected_hash':workflow['content_hash'],'max_cost_usd':0.05}
+  fixture=AsyncMock(return_value=({'value':'synthetic'},0.01,{'model':'synthetic-model','usage':{'input_tokens':1,'output_tokens':1}}))
+  with patch.object(fixture_suite,'model_fixture',fixture):
+   result=await self.call('run_fixture_suite',**args);replay=await self.call('run_fixture_suite',**args)
+  self.assertEqual(result,replay);self.assertTrue(result['passed']);self.assertEqual(fixture.await_count,1);self.assertEqual(result['cost_usd'],0.01)
+  agent=await self.call('read_agent_draft',draft_id=draft['draft_id']);self.assertTrue(agent['draft']['fixture_suite']['passed'])
+ async def test_v2_seven_capability_design_single_apply_and_fixture_regression(self):
+  # Structural acceptance only: external results and the model are synthetic stubs.
+  # Start a separate synthetic build session instead of copying the other tests history.
+  self.db.sql("update flux_private.builder_sessions set document='{}' where tenant='tenant-a' and user_id=$1",[U])
+  operations=[]
+  for key in ('attachment','document','ack'):
+   operations.append({'key':key,'tool':'propose_schema','arguments':{'resource_id':key+'-'+uuid.uuid4().hex[:8],'version':'1.0.0','label':'Synthetic '+key,'schema':{'type':'object','properties':{'value':{'type':'string'}}}}})
+  for key,output in (('parse','document'),('extract','ack')):
+   operations.append({'key':key,'tool':'propose_instructions','arguments':{'resource_id':key+'-'+uuid.uuid4().hex[:8],'version':'1.0.0','label':'Synthetic '+key,'text':'Copy the synthetic value.','model_contract':{'output_schema':'$schema:'+output,'max_tokens':100,'refusal_behavior':'REVIEW_REQUIRED','prompt_version':'1.0.0'}}})
+  operations.append({'key':'checks','tool':'propose_rule','arguments':{'resource_id':'checks-'+uuid.uuid4().hex[:8],'version':'1.0.0','label':'Synthetic check','rule':[{'op':'present','field':'value'}]}})
+  for key,kind,scopes in (('mail','graph_app',['mail.read']),('erp','epicor_rest_basic',['epicor.read']),('teams','teams_app',['teams.send'])):
+   spec=b.mcp_v2.SECRET_KINDS[kind]
+   operations.append({'key':key,'tool':'propose_secret_request','arguments':{'key':key+'-'+uuid.uuid4().hex[:8],'secret_kind':kind,'purpose':'Synthetic structural test only','systems':[spec[2]],'scopes':scopes,'environment':'TEST','accountable_role':'Synthetic owner','rotation_days':90,'used_by_nodes':[key],'fields_required':spec[0]}})
+  nodes=[]
+  for key,cap,inp,out in [('retriever','READ','attachment','attachment'),('parser','DOC','attachment','document'),('converter','MAP','document','document'),('extractor','REASON','document','ack'),('matcher','READ','ack','ack'),('checker','RULE','ack','ack'),('notifier','COMMS','ack','ack')]:
+   fields={'input.schema':'$schema:'+inp,'output.schema':'$schema:'+out,'output.record_type':'none'}
+   a=self.agent(**fields);a['capability']=cap;a['fixtures']=[{'name':'synthetic','input':{'value':'synthetic'},'expected':{'outcome':'COMPLETED','fields':{}}}]
+   if cap in ('DOC','REASON'):
+    a['fields'].update({'execute.model_access':'sonnet','execute.instructions':'$instructions:'+('parse' if cap=='DOC' else 'extract'),'execute.cost_ceiling':'0_05'})
+   elif cap=='MAP':a['mapping']={'value':'value'}
+   elif cap=='RULE':a['fields']['execute.rule']='$rule:checks'
+   else:a['fixtures'][0]['adapter_result']={'value':'synthetic'}
+   if key in ('retriever','matcher','notifier'):
+    req={'retriever':('mail','mail.read'),'matcher':('erp','epicor.read'),'notifier':('teams','teams.send')}[key];a['connection_requirements']=[{'secret_request':'$secret_request:'+req[0],'capabilities':[req[1]]}]
+   nodes.append({'key':key,'agent':a})
+  operations.append({'key':'workflow','tool':'propose_connected_workflow','arguments':{'name':'Synthetic seven responsibility regression','nodes':nodes,'edges':[{'source':nodes[i]['key'],'target':nodes[i+1]['key'],'on_outcome':'COMPLETED'} for i in range(6)],'entry_nodes':['retriever'],'terminal_outcomes':[{'node':'notifier','outcome':'COMPLETED','destination':'terminal'}]}})
+  result=await self.call('propose_change_set',request_id=str(uuid.uuid4()),title='Synthetic seven-agent v2 acceptance',operations=operations)
+  self.assertEqual(len([m for m in result['members'] if m['kind']=='agents']),7)
+  self.assertTrue(result['validation']['blocks_publish']) # missing human/integration/business inputs remain honest blockers.
+  self.ctx['token']='flx_browser';await b.review(self.store,{'record_kind':'change_sets','record_id':result['id']},True,result['content_hash'],confirm_proposed=True,approve_resources=True);self.ctx['token']='fmca_synthetic'
+  wid=next(m['id'] for m in result['members'] if m['kind']=='workflows');w=await self.call('read_workflow',workflow_id=wid)
+  with patch('app.fixture_suite.model_fixture',AsyncMock(return_value=({'value':'synthetic'},.001,{'mode':'mocked_model'}))) as model:
+   suite=await self.call('run_fixture_suite',request_id=str(uuid.uuid4()),workflow_id=wid,expected_hash=w['content_hash'],max_cost_usd=.01)
+  self.assertTrue(suite['passed'],suite);self.assertEqual(model.await_count,2);self.assertEqual(len(suite['nodes']),7);self.assertFalse(suite['live_actions'])
+ async def test_v2_record_reads_require_exact_company_runtime_package_and_declared_type(self):
+  wid='record-'+uuid.uuid4().hex;sid='source-'+uuid.uuid4().hex;aid=uuid.uuid4().hex
+  w={'id':wid,'version':'0.0.1','tenant':'tenant-a','company':'BMC','facility':'500'}
+  self.db.sql('insert into flux_app_objects values($1,$2,$3,now())',['tenant-a','workflows/'+wid+'--0.0.1.json',json.dumps(w)])
+  definition={'steps':[{'agent_id':'parser','guided':{'fields':{'output.record_type':{'value':'document.read'}}}}]}
+  self.db.sql("insert into flux_private.mail_sources values($1,'tenant-a',now())",[sid]);self.db.sql("insert into flux_private.mail_pipelines values($1,'tenant-a','BMC',$2,$3,'definition-pin')",[sid,wid,json.dumps(definition)])
+  body={'origin':'canvas_runtime','workflow_id':wid,'agent_id':'parser','definition_hash':'definition-pin','output':{'value':'synthetic','file_id':'file-synthetic','contentBytes':'DO_NOT_RETURN','signed_url':'https://example.invalid/file?token=do-not-return'}}
+  self.db.sql("insert into flux_private.mail_artifacts values($1,$2,'parsed',now(),'completed',$3,'result-hash')",[sid,aid,json.dumps(body)])
+  result=await self.call('read_record',record_type='document.read',id=aid)
+  self.assertEqual(result['output'],{'value':'synthetic','file_id':'file-synthetic'});self.assertEqual(result['result_hash'],'result-hash')
+  with self.assertRaises(b.BuilderError):await self.call('read_record',record_type='other.record',id=aid)
+  self.db.sql("update flux_private.mail_pipelines set definition_hash='new-package' where source_id=$1",[sid])
+  with self.assertRaises(b.BuilderError):await self.call('read_record',record_type='document.read',id=aid)

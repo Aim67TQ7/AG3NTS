@@ -1,8 +1,8 @@
 # AG3NTS — FLUX Studio
 
-FLUX Studio builds and operates agents with explicit responsibilities, durable FLUX handoffs, versioned contracts, audit evidence and human review. This repository contains the full current application source captured from the PETE server on October 16, 2026, including that day's deployed MCP/validator fixes.
+FLUX Studio builds and operates agents with explicit responsibilities, durable FLUX handoffs, versioned contracts, audit evidence and human review. This repository contains the full current application source captured from the PETE server on October 16, 2026, including the deployed MCP v2 proposal and runtime-observation changes.
 
-[Live application](https://flux.by-pete.com) · [MCP endpoint](https://flux.by-pete.com/mcp) · [MCP guide](docs/MCP-BUILD-SESSIONS.md) · [Governance](docs/WORKFLOW-GOVERNANCE.md)
+[Live application](https://flux.by-pete.com) · [MCP endpoint](https://flux.by-pete.com/mcp) · [MCP v2 guide](docs/MCP-V2.md) · [Governance](docs/WORKFLOW-GOVERNANCE.md)
 
 ## Features
 
@@ -77,15 +77,17 @@ sudo -n /usr/local/sbin/flux-studio-admin update
 
 The helper rebuilds and waits for service health. `/readyz` confirms readiness, not mailbox delivery, parsing or ERP behavior. Saving this repository does not deploy or alter runtime workflow state.
 
-## Validator release and verification
+## MCP v2 release and verification
 
-[October 16 verification report](docs/VALIDATOR-VERIFICATION-2026-10-16.md)
+[Release evidence and limitations](docs/MCP-V2-VERIFICATION-2026-10-16.md)
 
-Identical schema hashes now pass compatibility. Record-type collisions have separate node findings. Python and the generated private SQL predicate use the catalog's capability-aware lock metadata. Protected choices remain human-owned, with all protected fields listed together in errors. Connection diagnostics include caller keys, schema pins/hashes and pending proposals; pending changes are not silently merged.
+MCP v2 adds keyed atomic change sets, proposed human-owned choices, proposal inspection, current-draft validation, instruction resources, richer sandbox rules, fixtures, secure browser secret requests, recoverable archival and scoped runtime reads. Identical schema hashes pass edge compatibility, and record-type collisions have separate findings. Drafts remain TEST and Off.
 
-The deployed build passed 185 unit tests. Another 24 local PostgreSQL integration tests and authenticated HTTPS MCP acceptance checks passed. Read-only replay of the affected canvas confirmed the edge fix. Existing user proposals were not applied. The Bunting AI-connections review page separately returned HTTP 500 while the synthetic review endpoint passed; this remains documented and unresolved.
+Verification passed 193 unit tests, 34 local PostgreSQL integration tests, the frontend build and authenticated HTTPS checks. The seven-agent regression uses synthetic external results and mocked model responses. Live checks covered atomic browser Apply, deterministic fixtures, stored synthetic runtime result reads and redaction. No business action or provider call was made by the acceptance checks.
 
-Migration `20261016163110_flux_builder_catalog_locks.sql` is already applied to ZODA. Review migration history before applying it elsewhere. Generate policy SQL with `scripts/generate_builder_lock_sql.py` when catalog locks change; integration tests compare every option across all capabilities against the database predicate.
+Model fixture execution supports configured Sonnet only and needs explicit human confirmation, server enablement, verified prices and a call budget. Rich rule approval does not certify the existing runtime interpreter. Mailbox, ERP, Teams and write adapters still need real connectivity and package certification. Runtime record reads cover declared mail output records; unassigned historical imports are excluded. Templates currently support catalog-field slots, not mailbox-value slots or instantiation. Existing long-lived builder sessions can reach the 2 MB document limit.
+
+ZODA migrations `20261016174624_flux_mcp_v2_observation_and_review.sql` and `20261016175149_flux_mcp_v2_connection_environments.sql` follow the earlier catalog-lock migration. Review migration history before applying elsewhere. The existing Bunting AI-connections HTTP 500 was observed before v2; the synthetic endpoint passed v2 checks, but that account-specific failure has not been reverified as fixed.
 
 ## Data and credentials
 
