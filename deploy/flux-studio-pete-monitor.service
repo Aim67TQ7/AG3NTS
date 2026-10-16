@@ -1,0 +1,10 @@
+[Unit]
+Description=Private FLUX Studio monitoring bridge to PETE
+After=network-online.target
+Wants=network-online.target
+[Service]
+ExecStart=/usr/bin/ssh -NT -i /root/.ssh/flux_studio_pete_monitor -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/root/.ssh/flux_studio_pete_known_hosts -o ExitOnForwardFailure=yes -o ServerAliveInterval=20 -o ServerAliveCountMax=3 -R 127.0.0.1:8480:127.0.0.1:8480 -R 127.0.0.1:8481:127.0.0.1:8481 -R 127.0.0.1:8482:127.0.0.1:8482 -R 127.0.0.1:8484:127.0.0.1:8484 pete-dev@187.77.28.22
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target

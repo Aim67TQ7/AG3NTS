@@ -1,0 +1,28 @@
+[Unit]
+Description=FLUX Bunting email results and document JSON converter
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=flux-bunting-mail
+WorkingDirectory=/opt/flux-bunting-mail
+EnvironmentFile=/opt/.agent02_document_reader.env
+Environment=ANTHROPIC_API_KEY=
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=bridge.json:/etc/flux-bunting-mail.json
+ExecStart=/usr/bin/python3 /opt/flux-bunting-mail/bridge.py
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=256M
+[Install]
+WantedBy=multi-user.target

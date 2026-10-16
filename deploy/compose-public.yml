@@ -1,0 +1,39 @@
+name: flux-studio-public
+services:
+  studio:
+    image: flux-studio-public:current
+    build:
+      context: /home/pete-dev/flux-studio
+    container_name: flux-studio-public
+    network_mode: host
+    command: [uvicorn, app.main:app, --host, 172.18.0.1, --port, '8498', --no-proxy-headers, --no-access-log]
+    env_file: /opt/flux-studio-public/runtime.env
+    environment:
+      STUDIO_PUBLIC_HOST: flux.by-pete.com
+      STUDIO_PASSCODE_HASH_FILE: /run/secrets/pete-browser-passcode.json
+      STUDIO_DEPLOYMENT_ID: pete-https
+      STUDIO_OPERATOR_LABEL: PETE owner
+    labels:
+      caddy: flux.by-pete.com
+      caddy.reverse_proxy: 172.18.0.1:8498
+      caddy.header.X-Content-Type-Options: nosniff
+      caddy.header.Referrer-Policy: same-origin
+      caddy.header.Cache-Control: no-store
+    volumes:
+      - /home/pete-dev/projects/pete-mcp-gateway/.secrets/browser_passcode.json:/run/secrets/pete-browser-passcode.json:ro
+      - /home/pete-dev/flux-studio/references:/references:ro
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    mem_limit: 512m
+    pids_limit: 128
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; r=urllib.request.Request('http://172.18.0.1:8498/readyz',headers={'Host':'flux.by-pete.com'}); urllib.request.urlopen(r,timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}

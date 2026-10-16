@@ -1,0 +1,23 @@
+services:
+  flux-studio:
+    build: .
+    container_name: flux-studio
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    env_file: /opt/.flux_studio.env
+    network_mode: host
+    command: ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8496"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8496/health'))['status']=='ok'"]
+      interval: 15s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    volumes:
+      - /opt/agent01-graph-reader/app:/references/agent01/app:ro
+      - /opt/agent02-document-reader/app:/references/agent02/app:ro
+      - /opt/agent03-jev-classifier/app:/references/agent03/app:ro
+      - /opt/agent04-workflow-router/definition:/references/agent04/definition:ro

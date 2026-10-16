@@ -1,0 +1,14 @@
+.env
+.venv
+web/node_modules
+**/__pycache__
+deploy/*
+!deploy/mail_bridge/
+!deploy/mail_bridge/**
+*.png
+
+.venv-modern
+local-data
+
+references
+.venv-modern

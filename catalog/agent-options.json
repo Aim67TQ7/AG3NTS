@@ -1,0 +1,1349 @@
+{
+  "version": "1.0.0",
+  "guide_version": "1.0.0",
+  "capabilities": [
+    {
+      "code": "DOC",
+      "title": "Document Reader",
+      "description": "Turns a PDF, image or attachment into text and fields with page evidence",
+      "color": "#64748B"
+    },
+    {
+      "code": "READ",
+      "title": "Data Retriever",
+      "description": "Pulls exact records from Epicor, Graph, SharePoint or FLUX",
+      "color": "#0284C7"
+    },
+    {
+      "code": "MAP",
+      "title": "Field Mapper",
+      "description": "Reshapes one record format into another",
+      "color": "#0891B2"
+    },
+    {
+      "code": "RULE",
+      "title": "Rule Checker",
+      "description": "Applies an approved rule or comparison and returns pass, fail or review",
+      "color": "#7C3AED"
+    },
+    {
+      "code": "CLASS",
+      "title": "Classifier",
+      "description": "Sorts an item into one class from a fixed list, or UNKNOWN",
+      "color": "#0D9488"
+    },
+    {
+      "code": "ROUTE",
+      "title": "Router",
+      "description": "Decides which workflow or queue a record goes to next",
+      "color": "#D97706"
+    },
+    {
+      "code": "COMMS",
+      "title": "Messenger",
+      "description": "Drafts or sends an email, Teams message or alert",
+      "color": "#DB2777"
+    },
+    {
+      "code": "WRITE",
+      "title": "Transaction Writer",
+      "description": "Creates or updates a record in a business system",
+      "color": "#DC2626"
+    },
+    {
+      "code": "REASON",
+      "title": "Analyst",
+      "description": "Bounded model reasoning over supplied evidence",
+      "color": "#6D28D9"
+    }
+  ],
+  "locked": [
+    "identity.owner",
+    "identity.environment",
+    "execute.authority"
+  ],
+  "conditional_locked": [
+    {
+      "field": "execute.model_access",
+      "unless_value": "off"
+    },
+    {
+      "field": "verify.approval_gate",
+      "capabilities": [
+        "COMMS",
+        "WRITE"
+      ]
+    }
+  ],
+  "outcomes": {
+    "completed_only": [
+      "COMPLETED"
+    ],
+    "completed_no_action": [
+      "COMPLETED",
+      "NO_ACTION"
+    ],
+    "completed_review": [
+      "COMPLETED",
+      "REVIEW_REQUIRED"
+    ],
+    "full_set": [
+      "COMPLETED",
+      "NO_ACTION",
+      "REVIEW_REQUIRED",
+      "REJECTED",
+      "FAILED_FINAL"
+    ]
+  },
+  "steps": [
+    {
+      "id": "identity",
+      "title": "Identity",
+      "coach": "Name the agent for the one job it does. If you need the word 'and', it's two agents.",
+      "fields": [
+        {
+          "id": "identity.department",
+          "label": "Department",
+          "options": [
+            {
+              "id": "purchasing",
+              "label": "Purchasing"
+            },
+            {
+              "id": "accounts_payable",
+              "label": "Accounts payable"
+            },
+            {
+              "id": "sales",
+              "label": "Sales"
+            },
+            {
+              "id": "customer_service",
+              "label": "Customer service"
+            },
+            {
+              "id": "production_control",
+              "label": "Production control"
+            },
+            {
+              "id": "manufacturing",
+              "label": "Manufacturing"
+            },
+            {
+              "id": "engineering",
+              "label": "Engineering"
+            },
+            {
+              "id": "quality",
+              "label": "Quality"
+            },
+            {
+              "id": "logistics",
+              "label": "Logistics"
+            },
+            {
+              "id": "hr",
+              "label": "Hr"
+            },
+            {
+              "id": "finance",
+              "label": "Finance"
+            }
+          ]
+        },
+        {
+          "id": "identity.company",
+          "label": "Company",
+          "options": [
+            {
+              "id": "BMC",
+              "label": "BMC"
+            },
+            {
+              "id": "BME",
+              "label": "BME"
+            },
+            {
+              "id": "MAI",
+              "label": "MAI"
+            }
+          ]
+        },
+        {
+          "id": "identity.environment",
+          "label": "Environment",
+          "options": [
+            {
+              "id": "TEST",
+              "label": "TEST"
+            },
+            {
+              "id": "PROD",
+              "label": "PROD"
+            }
+          ]
+        },
+        {
+          "id": "identity.owner",
+          "label": "Owner",
+          "options": [],
+          "registry": "users"
+        }
+      ]
+    },
+    {
+      "id": "trigger",
+      "title": "Trigger",
+      "coach": "What event starts this agent? Most agents start when the agent before them saves a result.",
+      "fields": [
+        {
+          "id": "trigger.type",
+          "label": "What starts it",
+          "options": [
+            {
+              "id": "flux_record",
+              "label": "Flux record"
+            },
+            {
+              "id": "schedule",
+              "label": "Schedule"
+            },
+            {
+              "id": "mailbox_message",
+              "label": "Mailbox message"
+            },
+            {
+              "id": "sharepoint_file",
+              "label": "Sharepoint file"
+            },
+            {
+              "id": "api_request",
+              "label": "Api request"
+            },
+            {
+              "id": "studio_user_action",
+              "label": "Studio user action"
+            },
+            {
+              "id": "retry",
+              "label": "Retry"
+            }
+          ]
+        },
+        {
+          "id": "trigger.source_record",
+          "label": "Record that starts it",
+          "options": [
+            {
+              "id": "email.captured",
+              "label": "Email \u00b7 captured"
+            },
+            {
+              "id": "document.read",
+              "label": "Document \u00b7 read"
+            },
+            {
+              "id": "document.classified",
+              "label": "Document \u00b7 classified"
+            },
+            {
+              "id": "record.routed",
+              "label": "Record \u00b7 routed"
+            },
+            {
+              "id": "epicor.record_retrieved",
+              "label": "Epicor \u00b7 record retrieved"
+            },
+            {
+              "id": "comparison.result",
+              "label": "Comparison \u00b7 result"
+            },
+            {
+              "id": "review.decision",
+              "label": "Review \u00b7 decision"
+            },
+            {
+              "id": "schedule.tick",
+              "label": "Schedule \u00b7 tick"
+            },
+            {
+              "id": "none",
+              "label": "None"
+            }
+          ]
+        },
+        {
+          "id": "trigger.schedule",
+          "label": "Frequency",
+          "options": [
+            {
+              "id": "not_scheduled",
+              "label": "Not scheduled"
+            },
+            {
+              "id": "every_5_min",
+              "label": "Every 5 min"
+            },
+            {
+              "id": "every_15_min",
+              "label": "Every 15 min"
+            },
+            {
+              "id": "hourly",
+              "label": "Hourly"
+            },
+            {
+              "id": "daily_0600",
+              "label": "Daily 0600"
+            },
+            {
+              "id": "weekdays_0700",
+              "label": "Weekdays 0700"
+            }
+          ]
+        },
+        {
+          "id": "trigger.duplicates",
+          "label": "If it already ran",
+          "options": [
+            {
+              "id": "skip_if_key_seen",
+              "label": "Skip an already processed item"
+            },
+            {
+              "id": "process_new_revision_only",
+              "label": "Process new revision only"
+            },
+            {
+              "id": "always_process",
+              "label": "Always process"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "title": "Input",
+      "coach": "What record does it read, and what happens if something required is missing?",
+      "fields": [
+        {
+          "id": "input.schema",
+          "label": "Record format",
+          "options": [
+            {
+              "id": "needs_new_schema",
+              "label": "A new record format is needed"
+            }
+          ],
+          "registry": "published_schemas"
+        },
+        {
+          "id": "input.source_system",
+          "label": "Source System",
+          "options": [
+            {
+              "id": "flux",
+              "label": "Flux"
+            },
+            {
+              "id": "outlook_graph",
+              "label": "Outlook graph"
+            },
+            {
+              "id": "sharepoint",
+              "label": "Sharepoint"
+            },
+            {
+              "id": "epicor_baq",
+              "label": "Epicor baq"
+            },
+            {
+              "id": "epicor_rest",
+              "label": "Epicor rest"
+            },
+            {
+              "id": "supabase",
+              "label": "Supabase"
+            },
+            {
+              "id": "user_upload",
+              "label": "User upload"
+            }
+          ]
+        },
+        {
+          "id": "input.freshness",
+          "label": "How current must it be?",
+          "options": [
+            {
+              "id": "any",
+              "label": "Any"
+            },
+            {
+              "id": "under_1_hour",
+              "label": "Under 1 hour"
+            },
+            {
+              "id": "under_24_hours",
+              "label": "Under 24 hours"
+            },
+            {
+              "id": "current_revision_only",
+              "label": "Current revision only"
+            }
+          ]
+        },
+        {
+          "id": "input.when_missing",
+          "label": "If required information is missing",
+          "options": [
+            {
+              "id": "rejected",
+              "label": "Rejected"
+            },
+            {
+              "id": "review_required",
+              "label": "Review required"
+            },
+            {
+              "id": "failed_final",
+              "label": "Failed final"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "execute",
+      "title": "Execute",
+      "coach": "How does it do the job? Pick the simplest method that works. Rules before models.",
+      "fields": [
+        {
+          "id": "execute.method",
+          "label": "How it works",
+          "options": [
+            {
+              "id": "deterministic_map",
+              "label": "Deterministic map"
+            },
+            {
+              "id": "deterministic_rule",
+              "label": "Deterministic rule"
+            },
+            {
+              "id": "constrained_classification",
+              "label": "Constrained classification"
+            },
+            {
+              "id": "bounded_reasoning",
+              "label": "Bounded reasoning"
+            },
+            {
+              "id": "document_parse",
+              "label": "Document parse"
+            },
+            {
+              "id": "system_read",
+              "label": "System read"
+            },
+            {
+              "id": "message_send",
+              "label": "Message send"
+            },
+            {
+              "id": "transaction_write",
+              "label": "Transaction write"
+            }
+          ]
+        },
+        {
+          "id": "execute.authority",
+          "label": "Allowed access",
+          "options": [
+            {
+              "id": "P0",
+              "label": "Supplied data only"
+            },
+            {
+              "id": "P1",
+              "label": "Read approved resources"
+            },
+            {
+              "id": "P2",
+              "label": "Read approved systems"
+            },
+            {
+              "id": "P3",
+              "label": "Save internal workflow state"
+            },
+            {
+              "id": "P4",
+              "label": "Authorized communication"
+            },
+            {
+              "id": "P5",
+              "label": "Authorized business transaction"
+            }
+          ]
+        },
+        {
+          "id": "execute.model_access",
+          "label": "Model assistance",
+          "options": [
+            {
+              "id": "off",
+              "label": "Off"
+            },
+            {
+              "id": "jev_classifier",
+              "label": "Jev classifier"
+            },
+            {
+              "id": "sonnet",
+              "label": "Sonnet"
+            },
+            {
+              "id": "opus",
+              "label": "Opus"
+            }
+          ]
+        },
+        {
+          "id": "execute.time_limit",
+          "label": "Time limit",
+          "options": [
+            {
+              "id": "10s",
+              "label": "10s"
+            },
+            {
+              "id": "30s",
+              "label": "30s"
+            },
+            {
+              "id": "2m",
+              "label": "2m"
+            },
+            {
+              "id": "5m",
+              "label": "5m"
+            }
+          ]
+        },
+        {
+          "id": "execute.cost_ceiling",
+          "label": "Maximum cost per execution",
+          "options": [
+            {
+              "id": "zero",
+              "label": "$0.00"
+            },
+            {
+              "id": "0_01",
+              "label": "$0.01"
+            },
+            {
+              "id": "0_05",
+              "label": "$0.05"
+            },
+            {
+              "id": "0_25",
+              "label": "$0.25"
+            },
+            {
+              "id": "1_00",
+              "label": "$1.00"
+            }
+          ]
+        },
+        {
+          "id": "execute.instructions",
+          "label": "Procedure",
+          "options": [
+            {
+              "id": "none",
+              "label": "None"
+            },
+            {
+              "id": "needs_new_instructions",
+              "label": "A new procedure is needed"
+            }
+          ],
+          "registry": "instructions"
+        },
+        {
+          "id": "execute.rule",
+          "label": "Approved rule",
+          "options": [
+            {
+              "id": "none",
+              "label": "None"
+            },
+            {
+              "id": "needs_new_rule",
+              "label": "An approved rule is needed"
+            }
+          ],
+          "registry": "approved_rules"
+        }
+      ]
+    },
+    {
+      "id": "output",
+      "title": "Output",
+      "coach": "What does it save for the next agent, and which outcomes can it return?",
+      "fields": [
+        {
+          "id": "output.record_type",
+          "label": "Result it saves",
+          "options": [
+            {
+              "id": "email.captured",
+              "label": "Email \u00b7 captured"
+            },
+            {
+              "id": "document.read",
+              "label": "Document \u00b7 read"
+            },
+            {
+              "id": "document.classified",
+              "label": "Document \u00b7 classified"
+            },
+            {
+              "id": "record.routed",
+              "label": "Record \u00b7 routed"
+            },
+            {
+              "id": "epicor.record_retrieved",
+              "label": "Epicor \u00b7 record retrieved"
+            },
+            {
+              "id": "comparison.result",
+              "label": "Comparison \u00b7 result"
+            },
+            {
+              "id": "review.decision",
+              "label": "Review \u00b7 decision"
+            },
+            {
+              "id": "schedule.tick",
+              "label": "Schedule \u00b7 tick"
+            },
+            {
+              "id": "none",
+              "label": "None"
+            },
+            {
+              "id": "custom_needs_schema",
+              "label": "Custom needs schema"
+            }
+          ]
+        },
+        {
+          "id": "output.schema",
+          "label": "Record format",
+          "options": [
+            {
+              "id": "needs_new_schema",
+              "label": "A new record format is needed"
+            }
+          ],
+          "registry": "published_schemas"
+        },
+        {
+          "id": "output.outcomes",
+          "label": "Possible outcomes",
+          "options": [
+            {
+              "id": "completed_only",
+              "label": "Completed only"
+            },
+            {
+              "id": "completed_no_action",
+              "label": "Completed no action"
+            },
+            {
+              "id": "completed_review",
+              "label": "Completed or needs review"
+            },
+            {
+              "id": "full_set",
+              "label": "Completed, no action, review, rejected or failed"
+            }
+          ]
+        },
+        {
+          "id": "output.evidence",
+          "label": "Evidence it retains",
+          "options": [
+            {
+              "id": "source_refs_hashes",
+              "label": "Source refs hashes"
+            },
+            {
+              "id": "fields_with_page_locators",
+              "label": "Fields with page locators"
+            },
+            {
+              "id": "comparison_table",
+              "label": "Comparison table"
+            },
+            {
+              "id": "model_response_and_prompt_version",
+              "label": "Model response and prompt version"
+            },
+            {
+              "id": "target_readback_receipt",
+              "label": "Target readback receipt"
+            }
+          ]
+        },
+        {
+          "id": "output.next",
+          "label": "What happens next",
+          "options": [
+            {
+              "id": "none",
+              "label": "None"
+            },
+            {
+              "id": "chain_to_next_node",
+              "label": "Chain to next node"
+            },
+            {
+              "id": "route_by_outcome",
+              "label": "Route by outcome"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "error",
+      "title": "Error / Failure",
+      "coach": "When it fails, does it retry, and who hears about it?",
+      "fields": [
+        {
+          "id": "error.retry",
+          "label": "Retry plan",
+          "options": [
+            {
+              "id": "none",
+              "label": "None"
+            },
+            {
+              "id": "3x_exponential",
+              "label": "Up to 3 attempts with increasing delay"
+            },
+            {
+              "id": "5x_exponential",
+              "label": "Up to 5 attempts with increasing delay"
+            },
+            {
+              "id": "manual_only",
+              "label": "Manual only"
+            }
+          ]
+        },
+        {
+          "id": "error.retryable",
+          "label": "Which failures may retry?",
+          "options": [
+            {
+              "id": "timeouts_and_5xx",
+              "label": "Timeouts and 5xx"
+            },
+            {
+              "id": "rate_limit_only",
+              "label": "Rate limit only"
+            },
+            {
+              "id": "none",
+              "label": "None"
+            }
+          ]
+        },
+        {
+          "id": "error.escalation",
+          "label": "Where unresolved failures go",
+          "options": [
+            {
+              "id": "human_review_queue",
+              "label": "Human review queue"
+            },
+            {
+              "id": "owner_email",
+              "label": "Owner email"
+            },
+            {
+              "id": "teams_alert",
+              "label": "Teams alert"
+            },
+            {
+              "id": "dead_letter_only",
+              "label": "Dead letter only"
+            }
+          ]
+        },
+        {
+          "id": "error.ambiguous_external",
+          "label": "If an external action is uncertain",
+          "options": [
+            {
+              "id": "not_applicable",
+              "label": "Not applicable"
+            },
+            {
+              "id": "suspend_and_reconcile",
+              "label": "Suspend and reconcile"
+            },
+            {
+              "id": "review_required",
+              "label": "Review required"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "title": "Verify",
+      "coach": "How do we prove the job actually happened before anyone downstream trusts it?",
+      "fields": [
+        {
+          "id": "verify.postcondition",
+          "label": "Proof required",
+          "options": [
+            {
+              "id": "record_exists_schema_valid",
+              "label": "Record exists schema valid"
+            },
+            {
+              "id": "target_readback",
+              "label": "Target readback"
+            },
+            {
+              "id": "evidence_hash_match",
+              "label": "Evidence hash match"
+            },
+            {
+              "id": "human_approval_recorded",
+              "label": "Human approval recorded"
+            },
+            {
+              "id": "delivery_receipt",
+              "label": "Delivery receipt"
+            }
+          ]
+        },
+        {
+          "id": "verify.method",
+          "label": "How it works",
+          "options": [
+            {
+              "id": "automatic",
+              "label": "Automatic"
+            },
+            {
+              "id": "automatic_with_10pct_audit",
+              "label": "Automatic with 10pct audit"
+            },
+            {
+              "id": "human_signoff",
+              "label": "Human signoff"
+            }
+          ]
+        },
+        {
+          "id": "verify.fixtures",
+          "label": "Acceptance checks",
+          "options": [
+            {
+              "id": "standard_set",
+              "label": "Standard set"
+            },
+            {
+              "id": "standard_plus_model_safety",
+              "label": "Standard plus model safety"
+            }
+          ]
+        },
+        {
+          "id": "verify.approval_gate",
+          "label": "Approval needed",
+          "options": [
+            {
+              "id": "none",
+              "label": "None"
+            },
+            {
+              "id": "single_approver",
+              "label": "Single approver"
+            },
+            {
+              "id": "two_approvers",
+              "label": "Two approvers"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "title": "Review and save",
+      "coach": "Check the blockers. Save a draft anytime. Validate before you publish.",
+      "fields": []
+    }
+  ],
+  "rules": [
+    {
+      "id": "reason-model",
+      "when": {
+        "capability": [
+          "REASON"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.model_access",
+          "not_in": [
+            "off",
+            null
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "An Analyst needs model assistance chosen by you.",
+      "blocks_publish": true
+    },
+    {
+      "id": "class-review",
+      "when": {
+        "capability": [
+          "CLASS"
+        ]
+      },
+      "checks": [
+        {
+          "field": "output.outcomes",
+          "in": [
+            "completed_review",
+            "full_set"
+          ]
+        }
+      ],
+      "step": "output",
+      "message": "A Classifier must be able to return UNKNOWN or needs review.",
+      "blocks_publish": true
+    },
+    {
+      "id": "read-authority",
+      "when": {
+        "capability": [
+          "READ"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.authority",
+          "in": [
+            "P1",
+            "P2"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "A Data Retriever needs approved read access.",
+      "blocks_publish": true
+    },
+    {
+      "id": "comms-authority",
+      "when": {
+        "capability": [
+          "COMMS"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.authority",
+          "in": [
+            "P4"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "A Messenger needs authorized communication access.",
+      "blocks_publish": true
+    },
+    {
+      "id": "write-authority",
+      "when": {
+        "capability": [
+          "WRITE"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.authority",
+          "in": [
+            "P5"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "A Transaction Writer needs specifically authorized transaction access.",
+      "blocks_publish": true
+    },
+    {
+      "id": "external-approval",
+      "when": {
+        "capability": [
+          "COMMS",
+          "WRITE"
+        ]
+      },
+      "checks": [
+        {
+          "field": "verify.approval_gate",
+          "in": [
+            "single_approver",
+            "two_approvers"
+          ]
+        }
+      ],
+      "step": "verify",
+      "message": "Choose a human approval gate for this external action.",
+      "blocks_publish": true
+    },
+    {
+      "id": "write-readback",
+      "when": {
+        "capability": [
+          "WRITE"
+        ]
+      },
+      "checks": [
+        {
+          "field": "verify.postcondition",
+          "in": [
+            "target_readback"
+          ]
+        }
+      ],
+      "step": "verify",
+      "message": "Verify a transaction by reading the target back.",
+      "blocks_publish": true
+    },
+    {
+      "id": "write-reconcile",
+      "when": {
+        "capability": [
+          "WRITE"
+        ]
+      },
+      "checks": [
+        {
+          "field": "error.ambiguous_external",
+          "in": [
+            "suspend_and_reconcile"
+          ]
+        }
+      ],
+      "step": "error",
+      "message": "An uncertain transaction must pause and reconcile before retry.",
+      "blocks_publish": true
+    },
+    {
+      "id": "model-budget",
+      "when": {
+        "field": "execute.model_access",
+        "not_in": [
+          "off",
+          null
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.cost_ceiling",
+          "in": [
+            "0_01",
+            "0_05",
+            "0_25",
+            "1_00"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Model assistance needs a cost ceiling above zero.",
+      "blocks_publish": true
+    },
+    {
+      "id": "model-safety",
+      "when": {
+        "field": "execute.model_access",
+        "not_in": [
+          "off",
+          null
+        ]
+      },
+      "checks": [
+        {
+          "field": "verify.fixtures",
+          "in": [
+            "standard_plus_model_safety"
+          ]
+        }
+      ],
+      "step": "verify",
+      "message": "Include malformed output, invented class, prompt injection and budget checks.",
+      "blocks_publish": true
+    },
+    {
+      "id": "external-escalation",
+      "when": {
+        "capability": [
+          "WRITE",
+          "COMMS"
+        ]
+      },
+      "checks": [
+        {
+          "field": "error.escalation",
+          "not_in": [
+            "dead_letter_only",
+            null
+          ]
+        }
+      ],
+      "step": "error",
+      "message": "External actions need human escalation; a dead letter alone is insufficient.",
+      "blocks_publish": true
+    },
+    {
+      "id": "input-schema",
+      "when": {},
+      "checks": [
+        {
+          "field": "input.schema",
+          "not_in": [
+            "needs_new_schema",
+            null
+          ]
+        }
+      ],
+      "step": "input",
+      "message": "Publish needs a published input record format.",
+      "blocks_publish": true
+    },
+    {
+      "id": "output-schema",
+      "when": {},
+      "checks": [
+        {
+          "field": "output.schema",
+          "not_in": [
+            "needs_new_schema",
+            null
+          ]
+        }
+      ],
+      "step": "output",
+      "message": "Publish needs a published output record format.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-doc",
+      "when": {
+        "capability": [
+          "DOC"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "document_parse"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-read",
+      "when": {
+        "capability": [
+          "READ"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "system_read"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-map",
+      "when": {
+        "capability": [
+          "MAP"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "deterministic_map"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-rule",
+      "when": {
+        "capability": [
+          "RULE"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "deterministic_rule"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-class",
+      "when": {
+        "capability": [
+          "CLASS"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "constrained_classification"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-route",
+      "when": {
+        "capability": [
+          "ROUTE"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "deterministic_rule"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-comms",
+      "when": {
+        "capability": [
+          "COMMS"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "message_send"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-write",
+      "when": {
+        "capability": [
+          "WRITE"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "transaction_write"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "method-capability-reason",
+      "when": {
+        "capability": [
+          "REASON"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.method",
+          "in": [
+            "bounded_reasoning"
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose the execution method for this single capability.",
+      "blocks_publish": true
+    },
+    {
+      "id": "approved-rule-required",
+      "when": {
+        "field": "execute.method",
+        "in": [
+          "deterministic_rule"
+        ]
+      },
+      "checks": [
+        {
+          "field": "execute.rule",
+          "not_in": [
+            "none",
+            "needs_new_rule",
+            null
+          ]
+        }
+      ],
+      "step": "execute",
+      "message": "Choose an approved rule before publishing a Rule Checker or Router.",
+      "blocks_publish": true
+    }
+  ]
+}

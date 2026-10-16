@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+[ "$#" = 1 ] || exit 64
+case "$1" in
+ status) exec /usr/bin/docker compose -f /opt/flux-studio-public/compose.yml ps ;;
+ update) /usr/bin/docker compose -f /opt/flux-studio-public/compose.yml build; exec /usr/bin/docker compose -f /opt/flux-studio-public/compose.yml up -d --wait --wait-timeout 120 ;;
+ restart) exec /usr/bin/docker compose -f /opt/flux-studio-public/compose.yml restart studio ;;
+ *) exit 64 ;;
+esac
