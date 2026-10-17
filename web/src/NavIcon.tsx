@@ -1,0 +1,3 @@
+import React from 'react';
+const paths=['M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z','M4 21V3h16v18M8 7h2m4 0h2M8 12h2m4 0h2M9 21v-5h6v5','M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M12 7v6m0 3v1','M3 5h18v16H3zM7 2v6m5-6v6m5-6v6M7 12h10m-10 4h7','m14 4 6 6-11 11H3v-6ZM12 6l6 6','M3 3h7v7H3zM14 14h7v7h-7zM10 6h8v8','M3 7h18v14H3zM3 7V3h7l3 4','M2 12h5l3-8 4 16 3-8h5','M4 4h16v16H4zM8 12l3 3 6-7','M12 3a9 9 0 1 1-7 3M3 2v5h5M12 7v5l4 2','M4 21V3h16v18M8 16v-4m4 4V8m4 8v-6','M3 5h18v14H3zM3 5l9 8 9-8'];
+export default function NavIcon({index}:any){return <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[index]}/></svg>}

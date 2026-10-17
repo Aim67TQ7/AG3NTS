@@ -1,0 +1,2 @@
+import React from 'react';
+export default class PageBoundary extends React.Component<{children:React.ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return {failed:true}}render(){return this.state.failed?<section role="alert" className="card"><h2>This page could not be displayed</h2><p>Reload to retry. Saved definitions are retained.</p><button onClick={()=>location.reload()}>Reload page</button></section>:this.props.children}}

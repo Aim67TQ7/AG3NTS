@@ -62,3 +62,12 @@ class McpTests(unittest.IsolatedAsyncioTestCase):
   self.assertEqual(m.authorization(good),good)
   for bad in ({**good,'resource':'https://other.invalid'},{**good,'code_challenge_method':'plain'},{**good,'scope':'admin'}):
    with self.assertRaises(Invalid):m.authorization(bad)
+
+class DirectoryPresentationTests(unittest.TestCase):
+ def test_directory_exposes_titles_and_existing_safety_annotations(self):
+  from app.mcp_connection import tools
+  for tool in tools():
+   with self.subTest(tool=tool['name']):
+    self.assertTrue(tool.get('title'))
+    self.assertIn('readOnlyHint',tool['annotations'])
+    self.assertIn('destructiveHint',tool['annotations'])
