@@ -144,11 +144,10 @@ async def export(b:dict):
  return {'package':await export_canvas(canvas)}
 @router.post('/validate')
 async def inspect(b:dict):return validate(b.get('package'))
-@router.post('/import')
-async def import_package(b:dict):
+async def create_draft(package,draft_name=None):
  c=fresh.CTX.get()
  if not c or c['role'] not in ('owner','editor'):raise Invalid('Builder permission required')
- package=b.get('package');report=validate(package);catalog=await studio.catalog();nodes=[];ids={s['id']:str(uuid.uuid4()) for s in package['workflow']['steps']}
+ report=validate(package);catalog=await studio.catalog();nodes=[];ids={s['id']:str(uuid.uuid4()) for s in package['workflow']['steps']}
  for s in package['workflow']['steps']:
   fields={f['id']:{'value':None,'source':'missing','why':'Imported draft needs review'} for step in catalog['steps'] for f in step['fields']}
   for fn,values in s['functions'].items():
@@ -158,6 +157,9 @@ async def import_package(b:dict):
   g={'id':'draft-'+str(uuid.uuid4()),'version':'0.1.0','name':s['name'],'name_options':[s['name']],'responsibility':s.get('responsibility',''),'responsibility_options':[s.get('responsibility','')],'capability':s['capability'],'catalog_version':catalog['version'],'guide_version':catalog['guide_version'],'fields':fields,'input_config':s.get('configuration',{}).get('input_config',{'kind':'flux'}),'trigger_config':s.get('configuration',{}).get('trigger_config',{}),'bindings':s.get('bindings',{}),'reusable_resources':[],'portable_functions':s['functions'],'portable_contracts':s['contracts'],'portable_resource_slots':s['resources'],'questions_for_user':['Review the imported definition, map its resources, and test before activation.'],'user_edits':[]}
   nodes.append({'id':ids[s['id']],'type':'capability','position':s.get('position',{'x':100,'y':100}),'data':{'capability':s['capability'],'guided':g,'status':'Imported draft'}})
  edges=[{'id':str(uuid.uuid4()),'source':ids[e['from']['step']],'target':ids[e['to']['step']],'sourceHandle':e['from']['port'],'targetHandle':'input','data':{'direct':True,'semantics':'portable_durable_record','record_type':e.get('record_type'),'status':e.get('status'),'compatible':False}} for e in package['workflow']['connections']]
- workflow=await studio.save_canvas({'id':'canvas-'+str(uuid.uuid4()),'version':'0.0.1','name':package['workflow']['name'][:149]+' · imported','binding_mode':'records','nodes':nodes,'edges':edges,'portable_definition':package,'imported_package_hash':report['package_hash']})
+ workflow=await studio.save_canvas({'id':'canvas-'+str(uuid.uuid4()),'version':'0.0.1','name':draft_name or package['workflow']['name'][:149]+' · imported','binding_mode':'records','nodes':nodes,'edges':edges,'portable_definition':package,'imported_package_hash':report['package_hash']})
  await studio.store.event('workflow.json_imported',{'workflow_id':workflow['id'],'package_hash':report['package_hash'],'runtime_enabled':False,'resource_selections_created':False})
  return {'workflow':workflow,'validation':report,'note':'Imported as a new TEST draft. Resources require mapping; runtime adapters, approvals and activation were not imported.'}
+
+@router.post('/import')
+async def import_package(b:dict):return await create_draft(b.get('package'))

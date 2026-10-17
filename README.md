@@ -104,3 +104,5 @@ Saved agents support recoverable Archive/Restore controls in the Agent Library. 
 ### Portable workflow JSON
 
 Workflows → Workflow JSON supports versioned definition export, file loading, editing, validation, download, and import as a new TEST draft. Packages include six-function settings, JSON contracts, durable-record handoffs and portable resource slots. Credential values, selections and runtime authority are excluded. See [the workflow JSON guide](docs/workflow-json.md) and [JSON Schema](docs/workflow-package.schema.json). Import requires resource mapping, review and testing before separate activation.
+
+Agent Library → Templates → **Email to JSON** starts a new workflow with one mailbox address. The template includes retrieval, attachment parsing, JSON conversion, schemas, six-function settings and two handoffs. Each use creates an independent TEST draft with fresh IDs and no credential selections or installed runtime bindings. Mailbox permission and runtime access must be checked before separately enabling it; changing an address does not extend provider permissions.
