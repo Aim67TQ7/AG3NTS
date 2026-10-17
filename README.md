@@ -92,3 +92,7 @@ ZODA migrations `20261016174624_flux_mcp_v2_observation_and_review.sql` and `202
 ## Data and credentials
 
 Environment files, credentials, captured mail/attachments, runtime records, local databases, private mounted references and temporary tokens are excluded. Keep them in their authorized stores. Credential resources are selected by reference; saving one does not establish connectivity or grant mailbox permissions.
+
+### Agent capability library
+
+The Agent Library uses responsive capability cards with colored borders, capability icons, agent identity, responsibility, pinned resource references, and trigger/error/verification summaries. Search, saved templates, opening agents, and saving templates remain available. Runtime switches retain their existing server-backed status and permissions; the library does not infer execution counts, success rates, or costs from configuration. Header counts reflect saved agents, capability types, and saved templates.
