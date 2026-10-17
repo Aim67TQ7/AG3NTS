@@ -331,6 +331,8 @@ from . import planner
 app.include_router(planner.router)
 from . import library
 app.include_router(library.router)
+from . import credential_import
+app.include_router(credential_import.router)
 from . import reviews
 app.include_router(reviews.router)
 from . import teaching

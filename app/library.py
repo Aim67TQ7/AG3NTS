@@ -110,6 +110,11 @@ async def save(b:dict):
             await check('resource:'+id,'manage_secret' if b['kind']=='credential' else 'edit')
     r={'id':id,'version':version,'tenant':tenant,'label':label,'kind':b['kind'],'created_by':actor,'created_at':studio.store.now(),'use_roles':roles,'status':'draft','schema_version':'1.0.0'}
     if b.get('sharing'):r['sharing']=b['sharing']
+    if b.get('_import'):
+        # Internal call only: HTTP bodies cannot authorize import provenance.
+        from .credential_import import IMPORT_CONTEXT
+        if not IMPORT_CONTEXT.get():raise Invalid('Import provenance requires the owner import route')
+        info=b['_import'];r.update({'import_batch':info['batch'],'import_provenance':{k:info[k] for k in ('system','company','sources') if k in info},'connection_status':'imported_unverified'})
     if b['kind']=='credential':
         secret=b.get('secret')
         if not isinstance(secret,str) or not 1<=len(secret)<=16384:raise Invalid('Credential value is required')
