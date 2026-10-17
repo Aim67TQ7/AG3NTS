@@ -336,6 +336,8 @@ from . import library
 app.include_router(library.router)
 from . import agent_lifecycle
 app.include_router(agent_lifecycle.router)
+from . import workflow_json
+app.include_router(workflow_json.router)
 from . import credential_import
 app.include_router(credential_import.router)
 from . import reviews

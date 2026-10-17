@@ -1,0 +1,258 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "workflow",
+    "resources"
+  ],
+  "properties": {
+    "format": {
+      "const": "operis.workflow"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "steps",
+        "connections"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "capability",
+              "functions",
+              "contracts",
+              "resources"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "responsibility": {
+                "type": "string",
+                "maxLength": 5000
+              },
+              "capability": {
+                "enum": [
+                  "CLASS",
+                  "COMMS",
+                  "DOC",
+                  "MAP",
+                  "READ",
+                  "REASON",
+                  "ROUTE",
+                  "RULE",
+                  "WRITE"
+                ]
+              },
+              "functions": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "trigger": {
+                    "type": "object"
+                  },
+                  "input": {
+                    "type": "object"
+                  },
+                  "execute": {
+                    "type": "object"
+                  },
+                  "output": {
+                    "type": "object"
+                  },
+                  "error": {
+                    "type": "object"
+                  },
+                  "verify": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "trigger",
+                  "input",
+                  "execute",
+                  "output",
+                  "error",
+                  "verify"
+                ]
+              },
+              "configuration": {
+                "type": "object"
+              },
+              "bindings": {
+                "type": "object"
+              },
+              "contracts": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "input": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "output": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "position": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "adapter_hint": {
+                "type": "string",
+                "maxLength": 100
+              }
+            }
+          }
+        },
+        "connections": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "from",
+              "to",
+              "delivery"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "from": {
+                "type": "object",
+                "required": [
+                  "step",
+                  "port"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "step": {
+                    "type": "string"
+                  },
+                  "port": {
+                    "type": "string"
+                  }
+                }
+              },
+              "to": {
+                "type": "object",
+                "required": [
+                  "step",
+                  "port"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "step": {
+                    "type": "string"
+                  },
+                  "port": {
+                    "type": "string"
+                  }
+                }
+              },
+              "delivery": {
+                "const": "durable_record"
+              },
+              "record_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 300,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "asset",
+              "credential",
+              "instructions",
+              "rules",
+              "schema",
+              "template"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "content": {},
+          "system": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
