@@ -73,10 +73,11 @@ async def event(action,payload,**extra):
     x['content_hash']=digest(x)
     await put('audit/'+x['created_at'].replace(':','-')+'-'+x['record_id']+'.json',x)
     return x
-async def versions():
-    rows=await records('agents');published={x['payload']['agent_ref'] for x in await records('audit') if x['action']=='agent.published'}
+async def versions(include_archived=False):
+    from .agent_lifecycle import archived_ids
+    rows=await records('agents');audit=await records('audit');archived=archived_ids(audit);published={x['payload']['agent_ref'] for x in audit if x['action']=='agent.published'}
     for a in rows:a['status']='published' if a['id']+'@'+a['version'] in published else 'draft'
-    return rows
+    return rows if include_archived else [a for a in rows if a['id'] not in archived]
 async def agent(ref):
     ident(ref.replace('@','-'))
     for a in await versions():
@@ -149,11 +150,13 @@ async def health():
     return {'status':'ok' if r.status_code==200 else 'degraded','project':BASE,'store':'Operis private Storage','mode':'SSH-owner private access','existing_dispatch_modified':False,'version':APP_VERSION,'deployment':os.environ.get('STUDIO_DEPLOYMENT_ID','bunting-private')}
 @app.get('/api/state')
 async def state():
-    agents,resources,workflows,audit,runs=await asyncio.gather(versions(),records('resources'),records('workflows'),records('audit'),records('runs'))
+    agents,resources,workflows,audit,runs=await asyncio.gather(versions(True),records('resources'),records('workflows'),records('audit'),records('runs'))
     teach=await records('teaching');counts={}
     for r in teach:
         if r.get('owner')==ACTOR.get() and (r['agent_id'] not in counts or r['revision']>counts[r['agent_id']]['revision']):counts[r['agent_id']]={'revision':r['revision'],'open':sum(q['resolution']=='open' for q in r['questions'])}
-    return dict(interviews=counts,agents=agents,resources=resources,workflows=workflows,audit=sorted(audit,key=lambda x:x['created_at'],reverse=True),runs=sorted(runs,key=lambda x:x['created_at'],reverse=True))
+    from .agent_lifecycle import archived_ids
+    archived=archived_ids(audit)
+    return dict(interviews=counts,archived_agents=[a for a in agents if a['id'] in archived],agents=[a for a in agents if a['id'] not in archived],resources=resources,workflows=workflows,audit=sorted(audit,key=lambda x:x['created_at'],reverse=True),runs=sorted(runs,key=lambda x:x['created_at'],reverse=True))
 @app.post('/api/agents')
 async def create(a:dict):
     try:validate_agent(a)
@@ -331,6 +334,8 @@ from . import planner
 app.include_router(planner.router)
 from . import library
 app.include_router(library.router)
+from . import agent_lifecycle
+app.include_router(agent_lifecycle.router)
 from . import credential_import
 app.include_router(credential_import.router)
 from . import reviews

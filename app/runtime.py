@@ -29,13 +29,17 @@ def validate_config(config,synthetic=False):
  if cap=='RULE' and not spec.get('approved_rule_ref'):raise Invalid('Approved rule required')
  return config
 async def compile_workflow(id):
+ from .agent_lifecycle import archived_ids
+ archived=archived_ids(await studio.store.records('audit'))
  rows=[w for w in await studio.store.records('workflows') if w['id']==id]
  if not rows:raise Invalid('Save this canvas first')
  w=max(rows,key=lambda r:r.get('created_at',''));nodes=w.get('nodes',[])
  if not nodes or len(nodes)>30:raise Invalid('A workflow needs 1–30 built agents')
  builds=await studio.store.records('builds');sessions=await studio.store.records('teaching');steps=[]
  for node in nodes:
-  g=node.get('data',{}).get('guided',{});matches=[b for b in builds if b.get('agent_id')==g.get('id') and b.get('config',{}).get('guided_hash')==digest(g)]
+  g=node.get('data',{}).get('guided',{})
+  if g.get('id') in archived:raise Invalid('Restore archived agents before building this workflow')
+  matches=[b for b in builds if b.get('agent_id')==g.get('id') and b.get('config',{}).get('guided_hash')==digest(g)]
   if not matches:raise Invalid((g.get('name') or node['id'])+': Teach and build this exact card version first')
   build=max(matches,key=lambda b:b.get('source_revision',0));cfg=copy.deepcopy(build['config'])
   if build.get('package_hash')!=digest(build['files']) or build.get('status')!='tested' or not build.get('tests') or not all(t['passed'] for t in build['tests']):raise Invalid('Package hash or fixture tests are invalid')
