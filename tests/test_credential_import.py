@@ -1,7 +1,7 @@
-import base64,json,tempfile,time,unittest
+import asyncio,base64,json,tempfile,time,unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch,AsyncMock
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes,serialization
 from cryptography.hazmat.primitives.asymmetric import padding,rsa
@@ -23,6 +23,7 @@ class ImportBoundaryTests(unittest.TestCase):
  def test_sealed_bundle_round_trip(self):
   self.assertEqual(ci.bundle()['entries'][0]['secret'],'synthetic-secret')
   self.assertNotIn('synthetic-secret',(self.root/'bundle.json').read_text())
+  self.assertNotIn('synthetic-secret',json.dumps(asyncio.run(ci.preview())))
  def test_cross_client_and_nonowner_denied(self):
   for client,role in [('richmond','owner'),('bunting','editor'),('bunting','user')]:
    marker=fresh.CTX.set({'client':{'id':client},'role':role,'user':{'id':'synthetic-owner'}})
@@ -37,3 +38,19 @@ class ImportBoundaryTests(unittest.TestCase):
  def test_tampered_bundle_denied_without_payload_in_error(self):
   envelope=json.loads((self.root/'bundle.json').read_text());envelope['payload']='tampered';(self.root/'bundle.json').write_text(json.dumps(envelope))
   with self.assertRaisesRegex(Invalid,'No valid encrypted VPS import'):ci.bundle()
+
+class ImportCompanyContextTests(unittest.IsolatedAsyncioTestCase):
+ async def test_each_company_uses_own_context_and_restores_owner_on_failure(self):
+  original={'client':{'id':'bunting'},'role':'owner','user':{'id':'synthetic-owner'},'company':{'id':'bmc-id','code':'BMC'}}
+  marker=fresh.CTX.set(original)
+  data={'batch':'synthetic','entries':[{'company':'MAI','id':'a'},{'company':'BME','id':'b'}]}
+  seen=[]
+  async def save(e,d):
+   seen.append((fresh.CTX.get()['user']['id'],fresh.CTX.get()['company']['code']))
+   if e['id']=='b':raise Invalid('synthetic failure')
+   return {'id':'a'}
+  try:
+   with patch.object(ci,'bundle',return_value=data),patch.object(fresh,'rest',AsyncMock(return_value=[original['company'],{'id':'mai-id','code':'MAI'}])),patch.object(ci,'import_entry',save):
+    with self.assertRaises(Invalid):await ci.consume({'batch':'synthetic'})
+   self.assertEqual(seen,[('synthetic-owner','MAI'),('synthetic-owner','BMC')]);self.assertIs(fresh.CTX.get(),original)
+  finally:fresh.CTX.reset(marker)

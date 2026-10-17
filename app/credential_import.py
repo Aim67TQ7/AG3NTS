@@ -31,23 +31,29 @@ def bundle():
 async def preview():
  data=bundle()
  return {'batch':data['batch'],'entries':[{'id':e['id'],'label':e['label'],'company':e.get('company'),'system':e['system']} for e in data['entries']]}
+async def import_entry(e,data):
+ prior=await studio.store.get(library.path('bunting',e['id'],'1.0.0'))
+ if prior:
+  if prior.get('import_batch')!=data['batch'] or prior.get('created_by')!=fresh.CTX.get()['user']['id']:raise Invalid('Existing credential conflict; no overwrite performed')
+  return {'id':e['id'],'label':e['label'],'status':'already_imported'}
+ metadata={k:e[k] for k in ('system','company','sources') if k in e}
+ marker=IMPORT_CONTEXT.set(True)
+ try:result=await library.save({'kind':'credential','id':e['id'],'version':'1.0.0','label':e['label'],'secret':e['secret'],'use_roles':['owner'],'sharing':{'scope':'company','company':e['company']} if e.get('company') in ('BMC','MAI') else {'scope':'user'},'_import':{'batch':data['batch'],**metadata}})
+ finally:IMPORT_CONTEXT.reset(marker)
+ saved=await studio.store.get(library.path('bunting',e['id'],'1.0.0'))
+ if not saved or not saved.get('encrypted_value') or 'secret' in saved or 'content' in saved:raise Invalid('Encrypted import read-back failed')
+ return {'id':result['id'],'label':result['label'],'status':'imported'}
 @router.post('')
 async def consume(b:dict):
  data=bundle()
  if b.get('batch')!=data['batch']:raise Invalid('Refresh the staged import before importing')
- results=[]
+ companies=await fresh.rest(studio.store,'GET','flux_companies?select=*&client_id=eq.bunting')
+ by_code={c['code']:c for c in companies};results=[]
  for e in data['entries']:
-  prior=await studio.store.get(library.path('bunting',e['id'],'1.0.0'))
-  if prior:
-   if prior.get('import_batch')!=data['batch'] or prior.get('created_by')!=fresh.CTX.get()['user']['id']:raise Invalid('Existing credential conflict; no overwrite performed')
-   results.append({'id':e['id'],'label':e['label'],'status':'already_imported'});continue
-  metadata={k:e[k] for k in ('system','company','sources') if k in e}
-  marker=IMPORT_CONTEXT.set(True)
-  try:result=await library.save({'kind':'credential','id':e['id'],'version':'1.0.0','label':e['label'],'secret':e['secret'],'use_roles':['owner'],'sharing':{'scope':'company','company':e['company']} if e.get('company') in ('BMC','MAI') else {'scope':'user'},'_import':{'batch':data['batch'],**metadata}})
-  finally:IMPORT_CONTEXT.reset(marker)
-  # Read back only ciphertext presence and safe metadata; plaintext is never returned.
-  saved=await studio.store.get(library.path('bunting',e['id'],'1.0.0'))
-  if not saved or not saved.get('encrypted_value') or 'secret' in saved or 'content' in saved:raise Invalid('Encrypted import read-back failed')
-  results.append({'id':result['id'],'label':result['label'],'status':'imported'})
+  context=fresh.CTX.get()
+  # Use the actual company's RLS context, preserving the authenticated owner.
+  marker=fresh.CTX.set({**context,'company':by_code.get(e.get('company'),context.get('company'))})
+  try:results.append(await import_entry(e,data))
+  finally:fresh.CTX.reset(marker)
  await studio.store.event('credential.vps_import_completed',{'batch':data['batch'],'count':len(results),'resource_ids':[r['id'] for r in results]},tenant='bunting')
  return {'count':len(results),'items':results,'note':'Encrypted credentials saved; no agent selection or activation performed.'}
