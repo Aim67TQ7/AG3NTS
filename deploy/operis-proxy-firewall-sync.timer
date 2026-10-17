@@ -1,0 +1,11 @@
+[Unit]
+Description=Keep Operis proxy firewall access aligned after Docker restarts
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=operis-proxy-firewall-sync.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Reconcile the Caddy-only Operis firewall rule
+After=docker.service ufw.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/operis-proxy-firewall-sync
+TimeoutStartSec=60
+UMask=0077
