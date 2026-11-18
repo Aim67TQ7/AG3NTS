@@ -151,6 +151,9 @@ async def health():
 @app.get('/api/state')
 async def state():
     agents,resources,workflows,audit,runs=await asyncio.gather(versions(True),records('resources'),records('workflows'),records('audit'),records('runs'))
+    from .copackers_operator import installed_agent
+    external=installed_agent()
+    if external and not any(a['id']==external['id'] for a in agents):agents.append(external)
     teach=await records('teaching');counts={}
     for r in teach:
         if r.get('owner')==ACTOR.get() and (r['agent_id'] not in counts or r['revision']>counts[r['agent_id']]['revision']):counts[r['agent_id']]={'revision':r['revision'],'open':sum(q['resolution']=='open' for q in r['questions'])}
@@ -358,3 +361,7 @@ app.mount('/assets',StaticFiles(directory=WEB_ROOT/'assets'),name='assets')
 
 from . import governance
 app.include_router(governance.router)
+
+# Read-only observation; no native execution or credential access.
+from . import copackers_operator
+app.include_router(copackers_operator.router)
