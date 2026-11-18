@@ -1,3 +1,4 @@
+import ExternalDirectoryStatus from './ExternalDirectoryStatus';
 import {runtimeLabel} from './presentation';
 import React,{useEffect,useState,useSyncExternalStore} from 'react';
 let snapshot:any=null,listeners=new Set<()=>void>(),timer:any=null,loading=false;
@@ -9,6 +10,7 @@ export default function AgentPower({guided,workflowId,displayName,readOnly=false
  const state=useSyncExternalStore(subscribe,()=>snapshot),[guidedHash,setGuidedHash]=useState(''),[busy,setBusy]=useState(false),[note,setNote]=useState('');const encoded=JSON.stringify(guided);
  useEffect(()=>{let live=true;setGuidedHash('');if(guided)hash(guided).then(h=>{if(live)setGuidedHash(h)});return()=>{live=false}},[encoded]);
  if(!guided)return null;
+ if(guided.runtime_binding?.kind==='external_directory')return <ExternalDirectoryStatus/>;
  const control=state?.controls?.find((c:any)=>c.agent_id===guided.id),matching=state?.workflows?.filter((w:any)=>(!workflowId||w.id===workflowId)&&w.agents.some((a:any)=>a.id===guided.id&&a.guided_hash===guidedHash))||[];
  const enabled=matching.some((w:any)=>w.state==='active')&&control?.enabled!==false&&(!control||control.guided_hash===guidedHash),armed=control?.enabled&&control.guided_hash===guidedHash;
  const unknown=!state||state.unavailable||!guidedHash,healthy=enabled&&(matching.some((w:any)=>w.environment==='PRODUCTION_READ_ONLY')?matching.every((w:any)=>w.worker_ready):state?.worker_ready),color=unknown?'unknown':healthy?'on':enabled||armed?'waiting':'off';
